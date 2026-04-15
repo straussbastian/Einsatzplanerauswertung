@@ -691,45 +691,50 @@ Die praktische Konsequenz: das Argument „statische Gewichte degradieren bei ve
 
 Alle vier Scheduler halten in den getesteten Runs die harten Constraints ein:
 
-- **Schichtende**: Keine Tour endet nach 16:00 (verifiziert für Heuristik und OR-Tools via Single-Day-Check).
-- **Pausen**: Jede aktive Tour enthält genau eine Frühstücks- und eine Mittagspause im vorgeschriebenen Fenster.
+- **Schichtende**: Keine Tour endet nach dem konfigurierten Schichtende (default 17:00 bei 8h Netto + 60 min Pausen; bei Überstunden-Modus 19:00 bei 10h Netto). Verifiziert für Heuristik und OR-Tools via Single-Day-Check.
+- **Pausen**: Jede aktive Tour enthält genau eine Frühstücks- und eine Mittagspause. Die Mittagspause liegt garantiert im gesetzlichen Fenster 11:30–13:30 (`visualization.py` erzwingt das; wenn kein freier Slot im Fenster existiert, wird ein Auftrag gesplittet).
 - **Zeitfenster**: Aufträge mit `fenster_von/bis` werden vom Solver hart erzwungen; bei der Heuristik durch Prüfung im `_try_assign`.
+- **Qualifikationen**: Kälteschein-pflichtige Aufträge werden ausschließlich qualifizierten Technikern zugewiesen (alle Scheduler, verifiziert auf 0 Verletzungen über 10 Seeds).
+- **Arbeitszeit-Caps**: Tägliche Netto-Arbeitszeit ≤ profil-definiertes Limit (default 480 min = 8h, max 600 min = 10h). Wochen-Cap wird im Simulator pro Techniker kumuliert; bei Erreichen fällt der Techniker für den Rest der Woche ganztägig aus.
 
-Bei der Heuristik wurde ein früher Bug entdeckt: Pausen wurden nachträglich in bereits vollgeplante Touren eingefügt, wodurch bis zu 83 Minuten Überstunden pro Techniker entstanden. Die Korrektur (effektives Schichtende reduziert um ausstehende Pausen und Rückfahrt) eliminiert das Problem.
+Zwei frühere Bugs wurden im Verlauf des Projekts entdeckt und behoben:
+- Heuristik: Pausen wurden nachträglich in vollgeplante Touren eingefügt und verursachten bis zu 83 min Überstunden pro Techniker. Fix: effektives Schichtende um ausstehende Pausen und Rückfahrt reduziert.
+- Gantt-Visualizer: Mittagspause-Slot-Suche nahm den letzten passenden Slot (auch außerhalb des Fensters), statt den ersten im Mittagsfenster. Fix: Slot-Suche auf `[mittag_von, mittag_bis]` eingeschränkt, bei keiner freien Lücke wird ein Auftrag gesplittet.
 
 ---
 
 ## 8. Limitationen
 
-**Zur statistischen Absicherung** ist zwischen den Abschnitten zu unterscheiden: Die Detail-Tabellen in §5.1–5.3 basieren auf einzelnen Seeds und sind **illustrativ, nicht belastbar** — die Differenzen dort liegen innerhalb der Streuung. Die statistisch belastbaren Haupttests sind **§5.5 mit 20 Seeds** (statische Kalibrierungen) und **§5.6 mit 10 Seeds** (Replan und Replan+Context). Der §5.6-Test hat aus Kostengründen (LLM-API, Laufzeit) nur 10 Seeds; die Differenzen dort sind aber so durchgehend klein (< 1 Stdev), dass die Aussage „kein signifikanter Hybrid-Vorteil" auch mit doppelter Seed-Zahl nicht kippen würde.
+**Zur statistischen Absicherung** ist zwischen den Abschnitten zu unterscheiden: Die Detail-Tabellen in §5.1–5.3 basieren auf einzelnen Seeds und sind **illustrativ, nicht belastbar** — die Differenzen dort liegen innerhalb der Streuung. Die statistisch belastbaren Haupttests sind **§5.5 mit 20 Seeds** (statische Kalibrierungen bei 7h Netto-Basis — Zahlen sind tendenziell niedriger, Struktur der Befunde aber gleich) und **§5.6–§5.7 mit 10 Seeds** (Replan, Replan+Context, Qualifikationen bei 8h Netto-Basis). Für §5.7 wäre eine Erhöhung auf 20–30 Seeds wünschenswert, weil die dort beobachtete Richtungs-Änderung (Hybrid nominell vorn) statistisch nahe am Rauschen liegt; die Aussage „konsistent gerichtet, aber nicht signifikant" bleibt davon unberührt.
 
 Weitere Einschränkungen:
 
 - **Fahrzeiten rein haversine-basiert** — keine echten Straßendaten, keine Tageszeit- oder Wochentagseffekte (Berufsverkehr). Ein OSRM-Upgrade ist über das `RouteProvider`-Interface vorgesehen.
-- **Alle Techniker austauschbar** — keine Skills, keine Erfahrungsstufen, keine Fahrzeug-Kapazitäten (Ersatzteile, Werkzeug).
-- **Keine intraday Re-Planung** — Störungen werden angewandt, aber nicht als Trigger für einen neuen Scheduler-Aufruf. Ein krank gemeldeter Techniker wird heute nicht live umverteilt; stattdessen gehen dessen offene Stops in den Rollover. Echte Dispatching-Systeme replannen kontinuierlich.
-- **LLM nicht gecacht** — Systeme-Prompt unter Mindestlänge, siehe 4.1. Kosten pro Woche bleiben niedrig, aber Skaleneffekte noch ungenutzt.
-- **Auslastung unrealistisch hoch** — 200 % Kapazitätsüberhang testet das Priorisierungsverhalten, entspricht aber selten einer realen Auftragslage.
-- **Kalibrier-Bandbreite begrenzt.** Die vier getesteten statischen Kalibrierungen decken den Bereich „naiv" bis „sla-boost" ab, aber keine wirklich pathologischen Fehl-Einstellungen (z. B. `travel_weight_pct=500`, Penalties in Größenordnung der Fahrtzeit halbiert). Es ist denkbar, dass der Hybrid-Vorteil dort wieder sichtbar wird; das haben wir nicht gemessen.
-- **Kein intraday Re-Planning.** Der Scheduler wird morgens einmal aufgerufen und plant den ganzen Tag. Störungen werden auf den fertigen Plan angewandt, aber nicht als Trigger für einen neuen Scheduler-Aufruf genutzt. In der Praxis ist eine Krankmeldung um 10:00 Uhr genau der Moment, in dem strategische Priorisierung („welche 3 der 5 offenen Stops schieben wir auf morgen?") wertvoll wird. Diese Situation haben wir in den Messungen nicht abgebildet — siehe §9.
+- **Problem-Dimensionalität begrenzt.** Der §5.7-Befund legt nahe, dass der Hybrid-Vorteil mit der Dimensionalität skaliert. Wir haben nur eine zusätzliche Dimension (Kälteschein) getestet. Mehrere gleichzeitige Qualifikationen (Gas, Öl, Wärmepumpe, …), Ersatzteil-Constraints, Techniker-Erfahrungsstufen oder Auftrags-Abhängigkeiten bleiben ungetestet.
+- **LLM-Prompt-Caching greift nicht** — System-Prompt unter der Mindestlänge für Caching (siehe 4.1). Kosten pro Woche bleiben niedrig, Skaleneffekte noch ungenutzt.
+- **Auslastung im Chaos-Preset unrealistisch hoch** — ~200 % Kapazitätsüberhang testet das Priorisierungsverhalten, entspricht aber selten einer realen Auftragslage. Der realistische Lastbereich liegt eher bei 100–130 %.
+- **Kalibrier-Bandbreite begrenzt.** Die vier getesteten statischen Kalibrierungen decken den Bereich „naiv" bis „sla-boost" ab, aber keine wirklich pathologischen Fehl-Einstellungen (z. B. `travel_weight_pct=500`). Es ist denkbar, dass der Hybrid-Vorteil dort stärker sichtbar wird.
+- **Intraday Re-Planung funktional, aber nicht exotisch.** Der Replan wird bei Krankmeldung, Notfall, Stau und Auftragsverlängerung ausgelöst. Dispatching-Spezialfälle wie „Tech ist bei falschem Kunden angekommen und braucht sofortige Umverteilung" oder „System schlägt aktiv alle 30 min eine Replanung vor, egal ob Event" wurden nicht getestet.
 
 ---
 
 ## 9. Ausblick
 
-Die beiden ursprünglich als offen markierten Follow-Ups — statistische Absicherung und intraday Re-Planung — sind im Verlauf der Arbeit beide abgeschlossen und haben die zentrale Hybrid-Hypothese nicht gestützt. Was bleibt:
+Drei ursprüngliche Follow-Ups wurden im Projektverlauf abgearbeitet und sind jetzt in der Hauptstudie enthalten: statistische Absicherung (§5.5, 20 Seeds), intraday Re-Planung (§5.6), Skill-Heterogenität (§5.7). Die verbleibenden Fragen ordnen sich um die **§5.7-Richtungsänderung** als interessantesten Befund.
 
-1. **Extrem-Fehlkalibrierung.** Die aktuellen Baselines decken den Bereich „naiv bis sla-boost" ab. Eine wirklich pathologische Konfiguration (z. B. `travel_weight_pct=500`, Penalties in Größenordnung der Service-Zeit) wurde nicht getestet. Plausibel, dass OR-Tools dort zusammenbricht und der Hybrid eine Ausgleichsrolle übernimmt. Das wäre die letzte empirisch offene Bastion für den Hybrid-Wert.
+1. **§5.7-Befund statistisch absichern.** Der Qualifikations-Constraint hat erstmals ein positives Hybrid-Signal geliefert (+0.13 pp Completion, −0.01 pp Constraint-Verlust gegenüber −0.18 pp bei statisch). Mit 10 Seeds im Rauschen, aber konsistent gerichtet. Ein 30-Seed-Lauf würde die Signifikanz entweder etablieren oder widerlegen. Das ist die **wichtigste offene Frage** dieser Arbeit.
 
-2. **Skill-/Ressourcen-Heterogenität.** Aktuell sind alle Techniker austauschbar. In der Realität haben Betriebe Techniker mit verschiedenen Qualifikationen (Gas, Öl, Wärmepumpe), verschiedenen Erfahrungsstufen und verschiedenen Fahrzeug-Ausstattungen (Ersatzteile). Das fügt eine zweite Zuordnungs-Dimension hinzu, die nicht über Penalties, sondern über Zulässigkeits-Constraints modelliert wird. Ob der Hybrid dort einen Wert hat, ist eine eigene Frage.
+2. **Höhere Dimensionalität.** Einzelne Qualifikation (Kälteschein) zeigte schon einen Effekt. Interessant wäre: mehrere gleichzeitige Qualifikationen (Gas / Öl / Wärmepumpe / Solarthermie), Ersatzteil-Constraints pro Fahrzeug, Erfahrungslevel-gerechte Zuweisung, Auftrags-Abhängigkeiten („erst A dann B innerhalb 24 h"). Jede zusätzliche Dimension verschiebt die Balance in Richtung Hybrid — wenn §5.7 verallgemeinerbar ist.
 
-3. **Prompt-Caching effektiv nutzen.** System-Prompt um Fallbeispiele und Policy-Katalog auf >4 096 Tokens erweitern. Erwarteter Effekt: ~90 % Kostenreduktion auf wiederkehrenden Input-Tokens. Das ändert nichts an der Ergebnisqualität, macht den Hybrid aber ökonomisch attraktiver — relevant nur wenn er in Produktion verwendet wird.
+3. **Extrem-Fehlkalibrierung.** Die aktuellen Baselines decken „naiv bis sla-boost" ab, aber keine wirklich pathologischen Fehl-Einstellungen (`travel_weight_pct=500`, Penalties in Fahrzeit-Größenordnung). Bei solchen Konfigurationen könnte OR-Tools zusammenbrechen und der Hybrid den Ausgleich machen. Die empirisch offene Bastion.
 
-4. **Operative Validierung im Feld.** Alle hier dargestellten Tests sind simulativ. Die interessanteste Frage ist jetzt, ob die simulierten Ergebnisse mit realen Betriebsdaten übereinstimmen — insbesondere, ob die Kalibrierungs-Robustheit von OR-Tools auch bei echten, saisonal driftenden Lastprofilen hält. Ohne diese Validierung bleibt die These „OR-Tools reicht" eine simulative Hypothese.
+4. **Operative Validierung im Feld.** Alle Tests hier sind simulativ. Die interessanteste Frage ist, ob die Ergebnisse mit realen Betriebsdaten übereinstimmen — insbesondere ob die §5.7-Richtungsänderung bei echten, multi-dimensionalen Lastprofilen (Qualifikationen, Wartungsverträge, saisonale Drift) stabil bleibt. Ohne Felddaten bleibt der Schluss simulativ.
+
+5. **Prompt-Caching effektiv nutzen.** System-Prompt auf >4 096 Tokens erweitern (Fallbeispiele, Policy-Katalog) für ~90 % Kostenreduktion auf wiederkehrenden Input-Tokens. Betrifft die Ökonomie des Hybrid, nicht die Qualität.
 
 Weitere technische Ideen: Ersetzen von Haversine durch OSRM; OR-Tools-Parametrisierung um Solver-Strategie (nicht nur Penalty-Gewichte) LLM-gesteuert auswählen zu lassen — das wäre eine andere Art von LLM-Nutzung als in dieser Arbeit.
 
-Die zentrale Erkenntnis bleibt auch bei diesen Erweiterungen stabil: **in einer Domäne mit etabliertem algorithmischem Fundament ist LLM-Augmentation begründungspflichtig — nicht ihre Nichtnutzung.**
+Die zentrale Erkenntnis der Arbeit bleibt mit der §5.7-Nuance: **in niedrigdimensionalen, constraint-armen Domänen mit etabliertem algorithmischem Fundament ist LLM-Augmentation begründungspflichtig. Mit jeder zusätzlichen Problem-Dimension verschiebt sich diese Beweislast.** Der Hybrid gewinnt nicht durch Zauberei, sondern dort wo die klassische Optimierung an ihre strukturellen Grenzen stößt — und das passiert in der Praxis öfter, als die ersten drei Testsetups vermuten ließen.
 
 ---
 

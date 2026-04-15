@@ -4,7 +4,7 @@
 
 Ein Experiment zur Frage: **Kann ein LLM-gestützter Scheduler einen klassischen VRPTW-Solver übertreffen — und wenn ja, wo?**
 
-Antwort der Arbeit, in einem Satz: _Ein vernünftig konstruierter OR-Tools-Solver ist in dieser Domäne nicht nur ebenbürtig, sondern in allen drei Testsetups marginal überlegen — selbst wenn der Hybrid genau die Information bekommt, die ihn theoretisch überlegen machen sollte. In einer Domäne mit etabliertem algorithmischem Fundament ist LLM-Augmentation begründungspflichtig — nicht ihre Nichtnutzung._
+Antwort der Arbeit, in zwei Sätzen: _In niedrigdimensionalen, geografisch dominierten Tourenplanungs-Problemen ist ein vernünftig konstruierter OR-Tools-Solver dem LLM-gestützten Hybrid ebenbürtig oder marginal überlegen. Erst wenn eine zweite harte Zuordnungs-Dimension hinzukommt — z. B. Skill-Matching wie der Kälteschein für Wärmepumpen — zeigt sich ein erster, konsistent gerichteter Hybrid-Vorteil. In einer Domäne mit etabliertem algorithmischem Fundament ist LLM-Augmentation begründungspflichtig — aber die Grenze verschiebt sich mit der Problem-Dimensionalität._
 
 ## 📄 Auswertungen
 
@@ -39,13 +39,14 @@ Fiktiver Heizungsbaubetrieb in Oldenburg (Oldb.) mit **10 Servicetechnikern**, d
 
 ## Kern-Ergebnisse
 
-Drei unabhängige Haupttests, alle mit demselben Befund:
+Vier unabhängige Haupttests in einer Progression — drei negative, ein richtungsweisend positiver Befund:
 
 | Test | Setup | Ergebnis |
 |---|---|---|
-| **Multi-Profil-Woche** | 20 Seeds, 5 Tagesprofile Mo–Fr (Normal, Hochlast, Notfallwoche, SLA-Katastrophe, Chaos) + stochastische Intraday-Events; vier statische Kalibrierungen + Hybrid | Alle fünf Varianten **statistisch ununterscheidbar**. Hybrid liefert **keinen Performance-Vorteil**. |
-| **Replan-Test** | 10 Seeds, dieselbe Woche; Intraday-Events triggern Scheduler-Replan | Replan hilft nur der Heuristik (+2.9 pp). Hybrid und OR-Tools verlieren beide leicht (−1.3 pp) durch kleinteilige Replan-Zyklen. |
-| **Replan + Tagesverlauf-Kontext** | 10 Seeds, Hybrid bekommt zusätzlich: wievielter Replan heute, Trigger-Event, bisheriger Fortschritt, Rest-Schicht pro Tech | **Kein Mittelwert-Gewinn** gegenüber „Replan ohne Kontext". Einziger Effekt: Run-zu-Run-Streuung des Hybrid sinkt (±2.43 → ±1.73). |
+| **Multi-Profil-Woche** | 20 Seeds, 5 Tagesprofile Mo–Fr + stochastische Intraday-Events; vier statische Kalibrierungen + Hybrid | Alle fünf Varianten **statistisch ununterscheidbar**. Hybrid liefert **keinen Performance-Vorteil**. |
+| **Replan-Test** | 10 Seeds, Intraday-Events triggern Scheduler-Replan | Replan hilft nur der Heuristik (+2.9 pp). Hybrid und OR-Tools verlieren beide leicht durch kleinteilige Replan-Zyklen. |
+| **Replan + Tagesverlauf-Kontext** | 10 Seeds, Hybrid bekommt Tagesverlaufs-Info (wievielter Replan, Trigger-Event, Rest-Schicht pro Tech) | **Kein Mittelwert-Gewinn** gegenüber „Replan ohne Kontext". Einziger Effekt: Streuung sinkt (±2.43 → ±1.73). |
+| **Qualifikations-Constraint** | 10 Seeds, 40 % Techniker mit Kälteschein, 20 % Aufträge erfordern ihn | **Erstes positives Signal**: Hybrid nominell +0.13 pp vor OR-Tools-normal, und verliert am wenigsten durch das Constraint (−0.01 pp vs. −0.18 bis −0.55 bei statischen Varianten). Statistisch noch nicht signifikant (n=10), aber konsistent gerichtet. |
 
 Details, Tabellen und Interpretation in der [wissenschaftlichen Auswertung](docs/auswertung.md).
 
