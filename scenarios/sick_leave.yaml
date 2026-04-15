@@ -1,0 +1,7 @@
+name: Krankmeldung
+beschreibung: Techniker T03 meldet sich am Dienstag um 10:00 krank.
+events:
+  - typ: techniker_krank
+    tag: 1
+    zeit: "10:00"
+    techniker: T03

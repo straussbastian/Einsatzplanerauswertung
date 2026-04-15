@@ -1,0 +1,20 @@
+name: Gemischte Störungen
+beschreibung: Krankmeldung, Absagen und Stau innerhalb einer Woche.
+events:
+  - typ: kunde_absage
+    tag: 0
+    zeit: "10:45"
+    auftrag: A0012
+  - typ: techniker_krank
+    tag: 2
+    zeit: "10:00"
+    techniker: T05
+  - typ: stau
+    tag: 3
+    zeit: "08:30"
+    stau_min: 30
+    betroffene_techniker: [T01, T02, T07]
+  - typ: kunde_absage
+    tag: 4
+    zeit: "11:00"
+    auftrag: A0210

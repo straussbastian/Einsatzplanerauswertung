@@ -1,0 +1,34 @@
+name: Chaos-Woche
+beschreibung: |
+  Extreme Stör-Woche: Krankmeldung, Absage, Stau und zwei Auftragsverlängerungen
+  (z.B. weil der Techniker vor Ort ein unerwartetes zusätzliches Problem findet).
+  Paart gut mit dem "Chaos"-Intensitätspreset.
+events:
+  - typ: auftrag_verlaengert
+    tag: 0
+    zeit: "09:30"
+    auftrag: A0015
+    extra_min: 90
+  - typ: kunde_absage
+    tag: 1
+    zeit: "08:15"
+    auftrag: A0045
+  - typ: techniker_krank
+    tag: 2
+    zeit: "10:00"
+    techniker: T04
+  - typ: auftrag_verlaengert
+    tag: 2
+    zeit: "14:30"
+    auftrag: A0150
+    extra_min: 60
+  - typ: stau
+    tag: 3
+    zeit: "08:30"
+    stau_min: 30
+    betroffene_techniker: [T01, T02, T07]
+  - typ: auftrag_verlaengert
+    tag: 4
+    zeit: "10:45"
+    auftrag: A0300
+    extra_min: 75

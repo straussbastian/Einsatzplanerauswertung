@@ -1,0 +1,12 @@
+streamlit>=1.30
+pandas>=2.0
+numpy>=1.26
+plotly>=5.20
+folium>=0.15
+streamlit-folium>=0.18
+pyyaml>=6.0
+python-dateutil>=2.8
+pytest>=8.0
+ortools>=9.10
+anthropic>=0.40
+python-dotenv>=1.0

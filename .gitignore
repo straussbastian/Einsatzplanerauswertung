@@ -1,0 +1,48 @@
+# === Secrets ===
+# Enthält ANTHROPIC_API_KEY — NIEMALS committen
+.env
+.env.*
+!.env.example
+
+# === Python ===
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# === Virtual environment ===
+.venv/
+venv/
+env/
+ENV/
+
+# === OS ===
+.DS_Store
+.DS_Store?
+._*
+Thumbs.db
+desktop.ini
+
+# === Editor / IDE ===
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# === Claude Code ===
+# Projektspezifische Claude-Konfiguration gehört nicht ins Repo
+.claude/
+
+# === Laufzeit-/Temp-Daten ===
+data/
+bench/smoke*.csv
+*.log
+
+# === Streamlit ===
+.streamlit/secrets.toml

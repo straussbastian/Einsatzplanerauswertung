@@ -1,0 +1,15 @@
+name: Kundenabsagen
+beschreibung: Mehrere Kunden sagen kurzfristig ab.
+events:
+  - typ: kunde_absage
+    tag: 0
+    zeit: "09:30"
+    auftrag: A0003
+  - typ: kunde_absage
+    tag: 2
+    zeit: "08:15"
+    auftrag: A0120
+  - typ: kunde_absage
+    tag: 3
+    zeit: "13:00"
+    auftrag: A0180
