@@ -122,7 +122,7 @@ def _render_gantt(tp: Tourenplan, techs: list | None = None) -> None:
     )
     fig.update_yaxes(autorange="reversed")
     fig.update_layout(height=420, margin=dict(l=10, r=10, t=10, b=10))
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width="stretch")
 
 
 def _render_map(tp: Tourenplan, auftraege_by_id: dict) -> None:
@@ -227,7 +227,7 @@ def render_tag_mode() -> None:
 
     tab1, tab2, tab3, tab4 = st.tabs(["Aufträge", "Gantt", "Karte", "Techniker"])
     with tab1:
-        st.dataframe(_auftraege_df(auftraege, state["datum"]), use_container_width=True, height=520)
+        st.dataframe(_auftraege_df(auftraege, state["datum"]), width="stretch", height=520)
         if tp.nicht_zugewiesen:
             st.warning(f"Nicht zugewiesen: {', '.join(tp.nicht_zugewiesen)}")
     with tab2:
@@ -235,7 +235,7 @@ def render_tag_mode() -> None:
     with tab3:
         _render_map(tp, auftraege_by_id)
     with tab4:
-        st.dataframe(_tourplan_summary(tp), use_container_width=True)
+        st.dataframe(_tourplan_summary(tp), width="stretch")
 
 
 def _events_df(we: WochenErgebnis) -> pd.DataFrame:
@@ -414,7 +414,7 @@ def render_woche_mode() -> None:
     )
     with tab1:
         df = tages_df(we)
-        st.dataframe(df, use_container_width=True)
+        st.dataframe(df, width="stretch")
         fig = px.bar(
             df.melt(id_vars="datum", value_vars=["erledigt", "storniert", "rollover"]),
             x="datum",
@@ -423,16 +423,16 @@ def render_woche_mode() -> None:
             barmode="group",
             height=360,
         )
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width="stretch")
     with tab2:
         ev_df = _events_df(we)
         if ev_df.empty:
             st.info("Keine Events in diesem Szenario.")
         else:
-            st.dataframe(ev_df, use_container_width=True)
+            st.dataframe(ev_df, width="stretch")
     with tab3:
         if we.offen_am_ende:
-            st.dataframe(_auftraege_df(we.offen_am_ende, we.ergebnisse[-1].datum), use_container_width=True)
+            st.dataframe(_auftraege_df(we.offen_am_ende, we.ergebnisse[-1].datum), width="stretch")
         else:
             st.success("Alle Aufträge erledigt oder storniert!")
     with tab4:
@@ -474,7 +474,7 @@ def _render_vergleich(ergebnisse: dict, bekannte: dict) -> None:
             )
         )
     df = pd.DataFrame(rows)
-    st.dataframe(df, use_container_width=True)
+    st.dataframe(df, width="stretch")
     fig = px.bar(
         df.melt(id_vars="scheduler", value_vars=["completion_pct", "prio_completion_pct", "auslastung_pct"]),
         x="variable",
@@ -483,7 +483,7 @@ def _render_vergleich(ergebnisse: dict, bekannte: dict) -> None:
         barmode="group",
         height=320,
     )
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width="stretch")
 
 
 if mode == "Tag":
