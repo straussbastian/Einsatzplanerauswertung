@@ -74,6 +74,24 @@ Features:
 - **Wochen-Modus**: Fünf-Tage-Lauf mit Szenario-Auswahl, Intensitäts-Presets (Normal / Hochlast / Notfallwoche / SLA-Katastrophe / Chaos / Realistisch), Pro-Woche-Auftragsmenge. Zeigt Tagesüberblick, Events, Gantt pro Tag, Karte pro Tag, bei Hybrid das LLM-Reasoning + die gewählten Gewichte.
 - **Arena**: Mehrere Scheduler parallel auf denselben Daten vergleichen, automatische Metrik-Tabelle und Balkendiagramme.
 
+### Gantt-Chart pro Tag
+
+Zeigt jeden Techniker als eigene Zeile, farblich unterschieden nach Stop-Typ (geplant / erledigt / storniert / nicht ausgeführt / Pause / Depot). Pausen werden realistisch mitten im Auftrag dargestellt, wenn die Arbeit über die Mittagszeit läuft.
+
+![Gantt pro Tag](assets/Gantt.png)
+
+### Karte pro Tag
+
+Folium-Karte mit Betriebshof und den Touren je Techniker, farblich getrennt. Klick auf einen Stop zeigt Auftrags-ID, Kunde, Adresse und Status.
+
+![Karte pro Tag](assets/Map.png)
+
+### Arena: mehrere Scheduler direkt vergleichen
+
+Multi-Select in der Sidebar wählt die Scheduler aus, die auf denselben generierten Daten laufen. Ergebnis ist eine Metrik-Tabelle plus Balkendiagramm-Vergleich über Completion, Prio-gewichtete Completion und Auslastung. Bei Hybrid werden zusätzlich Reasoning + gewählte Penalty-Gewichte angezeigt.
+
+![Arena-Vergleich](assets/Arena.png)
+
 ## Benchmark ausführen
 
 Der Multi-Seed-Benchmark reproduziert die Ergebnisse aus dem Auswertungsreport:
