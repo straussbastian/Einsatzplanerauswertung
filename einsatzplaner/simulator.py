@@ -121,7 +121,7 @@ def _apply_auftrag_verlaengert(tp: Tourenplan, event: Stoerung) -> list[str]:
         if betroffener.status != "geplant":
             continue
         datum = betroffener.start.date()
-        schicht_dt = datetime.combine(datum, time(16, 0))
+        schicht_dt = datetime.combine(datum, time(17, 0))
         betroffener.ende += delta
         if betroffener.ende > schicht_dt:
             if betroffener.auftrag_id:
@@ -346,7 +346,7 @@ def run_tag(
         )
         pending_pro_tech_min: dict[str, int] = {}
         rest_schicht_pro_tech_min: dict[str, int] = {}
-        schicht_ende_dt = datetime.combine(datum, time(16, 0))
+        schicht_ende_dt = datetime.combine(datum, time(17, 0))
         for tech in techniker:
             tour = tp.touren.get(tech.id)
             offen_min = 0
@@ -431,6 +431,9 @@ def run_woche(
     bekannte_auftraege: dict[str, Auftrag] = {}
     ergebnisse: list[TagesErgebnis] = []
     intraday_rng = random.Random(intraday_seed) if intraday_seed is not None else None
+    # Kumulierte Netto-Arbeitsminuten pro Techniker über die Woche — für das
+    # gesetzliche Wochen-Cap (ArbZG: 48 h Schnitt, max 60 h kurzzeitig).
+    wochen_arbeitszeit: dict[str, int] = {t.id: 0 for t in techniker}
 
     for tag in sorted(woche_auftraege.keys()):
         neue = woche_auftraege[tag]
@@ -448,6 +451,20 @@ def run_woche(
             ende_krank = s.zeitpunkt.date() + timedelta(days=max(0, s.dauer_tage - 1))
             if s.zeitpunkt.date() < tag <= ende_krank:
                 ausgeschlossen_ganztaegig.add(s.techniker_id)
+
+        # Wochen-Arbeitszeit-Cap: Techniker, die ihre wöchentliche Obergrenze
+        # bereits erreicht haben, fallen heute aus. Trigger-Schwelle kommt aus
+        # dem Profil-pro-Tag (default 2400 min = 40 h, bei Überstunden z.B. 3600 = 60 h).
+        cap_heute = 2400
+        if profil_pro_tag is not None:
+            p = profil_pro_tag.get(tag)
+            if p is not None:
+                cap_heute = p.wochen_netto_max_min
+        wochen_cap_erreicht = {
+            tid for tid, min_gesamt in wochen_arbeitszeit.items()
+            if min_gesamt >= cap_heute
+        }
+        ausgeschlossen_ganztaegig |= wochen_cap_erreicht
 
         techniker_heute = [t for t in techniker if t.id not in ausgeschlossen_ganztaegig]
 
@@ -475,6 +492,14 @@ def run_woche(
 
         ergebnis = run_tag(tag, techniker_heute, auftraege_heute, scheduler, route_provider, events_heute)
         ergebnisse.append(ergebnis)
+
+        # Wochen-Arbeitszeit pro Techniker fortschreiben (nur tatsächlich erledigte Stops)
+        for tid, tour in ergebnis.tourenplan.touren.items():
+            arbeit_tag = sum(
+                s.dauer_min for s in tour.stops
+                if s.typ == StopTyp.AUFTRAG and s.status == "erledigt"
+            )
+            wochen_arbeitszeit[tid] = wochen_arbeitszeit.get(tid, 0) + arbeit_tag
 
         new_backlog: list[Auftrag] = []
         for aid in ergebnis.rollover:

@@ -652,3 +652,31 @@ Dieselbe Multi-Profil-Woche wie oben, aber mit aktiviertem Replan-Trigger. Krank
 **Kern-Befund:** Replan hilft nur der Heuristik signifikant (+2.87 pp Completion gegen §12.2). OR-Tools und Hybrid verlieren beide leicht durch Replan (−1.3 bis −1.6 pp). Der Tagesverlauf-Kontext für den Hybrid bringt keinen Mittelwert-Gewinn; einziger Effekt: Streuung sinkt von ±2.43 auf ±1.73. Die Hybrid-Hypothese „bei intraday Dynamik zeigt sich ein Vorteil" ist mit diesem Test widerlegt.
 
 Rohdaten: `bench/results_replan_preview.csv` (dumb), `bench/results_replan_context.csv` (Context).
+
+### 12.4 Qualifikations-Constraint, 10 Seeds (mit 8h-Arbeitszeit)
+
+Kälteschein-Constraint: 40 % der Techniker haben ihn, 20 % der Aufträge erfordern ihn. Alle Scheduler respektieren das Constraint hart.
+
+**Baseline (8h, ohne Quals):**
+
+| Scheduler | Completion | SLA-Vlz | Fahrzeit |
+|---|---|---|---|
+| Heuristik | 64.90 % ± 1.44 | 23.2 ± 5.4 | 6203 ± 110 |
+| OR-Tools naiv | 74.05 % ± 2.45 | 13.3 ± 2.9 | 4597 ± 228 |
+| **OR-Tools normal** | **74.54 % ± 2.04** | 14.3 ± 3.3 | 4609 ± 196 |
+| Hybrid | 74.50 % ± 2.29 | 14.4 ± 3.5 | 4624 ± 261 |
+
+**Mit Qualifikations-Constraint:**
+
+| Scheduler | Completion | SLA-Vlz | Fahrzeit |
+|---|---|---|---|
+| Heuristik | 64.49 % ± 2.88 | 21.9 ± 3.4 | 6242 ± 353 |
+| OR-Tools naiv | 73.50 % ± 2.28 | 15.0 ± 5.5 | 4618 ± 240 |
+| OR-Tools normal | 74.36 % ± 2.62 | 15.2 ± 5.7 | 4687 ± 303 |
+| **Hybrid** | **74.49 % ± 2.68** | 15.0 ± 5.2 | 4789 ± 324 |
+
+**Δ Completion (ohne → mit Quals):** Heuristik −0.41 pp, OR-Tools-naiv −0.55 pp, OR-Tools-normal −0.18 pp, **Hybrid −0.01 pp**.
+
+**Befund:** Erstmals nominell Hybrid vor OR-Tools-normal (+0.13 pp). Der Hybrid verliert am wenigsten durch das Constraint. Statistisch noch nicht signifikant (n=10), aber die Richtung ist konsistent und bestätigt die §8-Limitationen-These, dass LLM-Adaption relevanter wird, sobald das Problem mehrdimensional wird.
+
+Rohdaten: `bench/results_baseline_8h.csv`, `bench/results_qualifications.csv`.

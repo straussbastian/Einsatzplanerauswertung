@@ -4,7 +4,7 @@ from dataclasses import dataclass
 
 import pandas as pd
 
-from .models import Dringlichkeit, StopTyp
+from .models import StopTyp
 from .simulator import WochenErgebnis
 
 
@@ -71,7 +71,7 @@ def compute_metriken(we: WochenErgebnis, auftraege_bekannt: dict[str, "Auftrag"]
         if a.sla_frist and we.ergebnisse and a.sla_frist <= we.ergebnisse[-1].datum:
             sla_verletzungen += 1
 
-    kapazitaet_min = n_techs * n_tage * 420  # 7h Nettoarbeitszeit/Tag
+    kapazitaet_min = n_techs * n_tage * 480  # 8h Nettoarbeitszeit/Tag
 
     return Metriken(
         scheduler_name=we.scheduler_name,

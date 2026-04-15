@@ -106,15 +106,27 @@ def _tages_statistik(pin: PlanInput) -> dict:
     gesamt_dauer = sum(a.dauer_min for a in auftraege)
     aktive_techs = len(pin.techniker) - len(pin.ausgeschlossene_techs)
 
+    # Netto-Arbeitszeit aus dem ersten Techniker ableiten (in unserem Setup einheitlich)
+    if pin.techniker:
+        t0 = pin.techniker[0]
+        schicht_brutto_min = (t0.schichtende.hour * 60 + t0.schichtende.minute) - (
+            t0.schichtbeginn.hour * 60 + t0.schichtbeginn.minute
+        )
+        pausen_min = t0.pause_fruehstueck_min + t0.pause_mittag_min
+        netto_min = max(1, schicht_brutto_min - pausen_min)
+        schicht_ende_min = t0.schichtende.hour * 60 + t0.schichtende.minute
+    else:
+        netto_min = 480
+        schicht_ende_min = 17 * 60
+
     if pin.ist_replan and pin.replan_ab is not None:
-        schicht_ende_min = 16 * 60
         replan_ab_min = pin.replan_ab.hour * 60 + pin.replan_ab.minute
         rest_brutto = max(0, schicht_ende_min - replan_ab_min)
-        # Grobe Schätzung: 60min Pausen werden durchschnittlich schon teilweise
-        # erledigt sein. Daher Netto ~= Brutto * 0.85 (konservativer Durchschnitt).
-        kapazitaet_min = aktive_techs * max(1, int(rest_brutto * 0.85))
+        # Grobe Schätzung: Pausen werden durchschnittlich schon teilweise
+        # erledigt sein. Netto ~= Brutto * 0.9 (8h Netto in 9h Brutto = 89 %).
+        kapazitaet_min = aktive_techs * max(1, int(rest_brutto * 0.9))
     else:
-        kapazitaet_min = aktive_techs * 420
+        kapazitaet_min = aktive_techs * netto_min
 
     stats = {
         "datum": pin.datum.isoformat(),

@@ -17,6 +17,9 @@ class Dringlichkeit(int, Enum):
     HOCH = 3
 
 
+QUAL_KAELTESCHEIN = "kaelteschein"
+
+
 @dataclass
 class Auftrag:
     id: str
@@ -33,6 +36,7 @@ class Auftrag:
     sla_frist: date | None = None
     notfall: bool = False
     rollover_count: int = 0
+    benoetigt_qualifikationen: frozenset[str] = field(default_factory=frozenset)
     created_at: datetime = field(default_factory=datetime.now)
 
     @property
@@ -47,12 +51,17 @@ class Techniker:
     home_lat: float = BETRIEBSHOF_LAT
     home_lon: float = BETRIEBSHOF_LON
     schichtbeginn: time = time(8, 0)
-    schichtende: time = time(16, 0)
+    schichtende: time = time(17, 0)  # 8h Netto-Arbeit + 60 min Pausen = 9h Brutto
     pause_fruehstueck_min: int = 15
     pause_mittag_min: int = 45
     max_arbeit_ohne_pause_min: int = 360
     mittag_fenster_von: time = time(11, 30)
     mittag_fenster_bis: time = time(13, 30)
+    qualifikationen: frozenset[str] = field(default_factory=frozenset)
+
+    def kann_uebernehmen(self, auftrag: Auftrag) -> bool:
+        """True wenn der Techniker alle vom Auftrag geforderten Qualifikationen besitzt."""
+        return auftrag.benoetigt_qualifikationen.issubset(self.qualifikationen)
 
 
 class StopTyp(str, Enum):

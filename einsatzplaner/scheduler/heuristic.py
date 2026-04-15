@@ -131,6 +131,8 @@ def _force_pause_if_needed(state: _TechState, needed_work_min: int) -> None:
 def _try_assign(
     state: _TechState, auftrag: Auftrag, rp: RouteProvider
 ) -> tuple[int, datetime, int] | None:
+    if not state.techniker.kann_uebernehmen(auftrag):
+        return None
     fahrzeit = rp.travel_time_min(state.next_lat, state.next_lon, auftrag.lat, auftrag.lon)
     ankunft = state.next_free + timedelta(minutes=fahrzeit)
 

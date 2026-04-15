@@ -18,8 +18,8 @@ from ..models import (
 from .base import PlanInput
 
 
-SCHICHT_DAUER_MIN = 480  # 8h
-NETTO_ARBEITS_MIN = 420  # 8h minus 60min Pausen
+SCHICHT_DAUER_MIN = 540  # 9h Brutto (8h Netto + 60 min Pausen)
+NETTO_ARBEITS_MIN = 480  # 8h reine Arbeit
 HORIZON_MIN = 900  # Puffer: großzügig genug für Replan-Szenarien mit spätem Start
 DEPOT_IDX = 0
 
@@ -203,6 +203,21 @@ class ORToolsScheduler:
         for node_idx, auftrag in enumerate(auftraege, start=auftrag_node_offset):
             routing.AddDisjunction([manager.NodeToIndex(node_idx)], _prio_penalty(auftrag, datum, self.weights))
 
+        # Qualifikations-Constraint: Aufträge mit erforderlichen Qualifikationen dürfen
+        # nur von entsprechend qualifizierten Fahrzeugen besucht werden. Techniker ohne
+        # Qualifikation werden als -1 markiert (= Auftrag gedroppt, falls kein passender Tech).
+        for node_idx, auftrag in enumerate(auftraege, start=auftrag_node_offset):
+            if not auftrag.benoetigt_qualifikationen:
+                continue
+            zulaessige_vehicles = [
+                vid for vid, ts in enumerate(tech_starts)
+                if ts.tech.kann_uebernehmen(auftrag)
+            ]
+            if zulaessige_vehicles:
+                routing.VehicleVar(manager.NodeToIndex(node_idx)).SetValues([-1] + zulaessige_vehicles)
+            else:
+                routing.VehicleVar(manager.NodeToIndex(node_idx)).SetValues([-1])
+
         search_params = pywrapcp.DefaultRoutingSearchParameters()
         search_params.first_solution_strategy = routing_enums_pb2.FirstSolutionStrategy.PATH_CHEAPEST_ARC
         search_params.local_search_metaheuristic = routing_enums_pb2.LocalSearchMetaheuristic.GUIDED_LOCAL_SEARCH
@@ -231,18 +246,24 @@ class ORToolsScheduler:
 
     def _build_tech_starts(self, active_techs: list[Techniker], pin: PlanInput) -> list["_TechStart"]:
         if not pin.ist_replan:
-            return [
-                _TechStart(
-                    tech=t,
-                    start_lat=t.home_lat,
-                    start_lon=t.home_lon,
-                    start_offset_min=0,
-                    pause_f_min=t.pause_fruehstueck_min,
-                    pause_m_min=t.pause_mittag_min,
-                    netto_rest_min=NETTO_ARBEITS_MIN,
+            result: list[_TechStart] = []
+            for t in active_techs:
+                brutto_min = (t.schichtende.hour * 60 + t.schichtende.minute) - (
+                    t.schichtbeginn.hour * 60 + t.schichtbeginn.minute
                 )
-                for t in active_techs
-            ]
+                netto = max(1, brutto_min - t.pause_fruehstueck_min - t.pause_mittag_min)
+                result.append(
+                    _TechStart(
+                        tech=t,
+                        start_lat=t.home_lat,
+                        start_lon=t.home_lon,
+                        start_offset_min=0,
+                        pause_f_min=t.pause_fruehstueck_min,
+                        pause_m_min=t.pause_mittag_min,
+                        netto_rest_min=netto,
+                    )
+                )
+            return result
 
         replan_ab = pin.replan_ab
         assert replan_ab is not None

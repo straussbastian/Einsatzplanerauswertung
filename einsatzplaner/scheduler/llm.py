@@ -25,9 +25,9 @@ DEINE AUFGABE: Verteile die gegebenen Aufträge auf die Servicetechniker so, das
 
 ARBEITSREGELN (hart):
 - Alle Techniker sind gleich qualifiziert und starten/enden am Betriebshof (53.1467, 8.1806)
-- Schichtzeit: 8:00-16:00 (8h = 480 min)
+- Schichtzeit: 8:00-17:00 (9h Brutto)
 - Davon 15 min Frühstückspause + 45 min Mittagspause = 60 min Pause
-- Nettoarbeitszeit: 420 min pro Techniker
+- Nettoarbeitszeit: 8h = 480 min pro Techniker (Pausen kommen ON TOP, nicht in 8h enthalten)
 - Frühstückspause ab ~10:00, Mittagspause im Fenster 11:30-13:30
 - Fahrzeiten: Luftlinie × 1.3 bei 50 km/h (~1.5 min pro km Luftlinie)
 - Zeitfenster (fenster_von/fenster_bis) müssen respektiert werden — Auftrag muss in dem Fenster komplett ausführbar sein
@@ -93,17 +93,36 @@ def _auftrag_to_dict(a: Auftrag, datum) -> dict:
         d["fenster"] = f"{a.fenster_von.strftime('%H:%M')}-{a.fenster_bis.strftime('%H:%M')}"
     if a.sla_frist:
         d["sla_in_tagen"] = (a.sla_frist - datum).days
+    if a.benoetigt_qualifikationen:
+        d["benoetigt"] = sorted(a.benoetigt_qualifikationen)
     return d
 
 
 def _build_user_prompt(pin: PlanInput) -> str:
-    techs = [t.id for t in pin.techniker]
+    techs_detail = [
+        {"id": t.id, "qualifikationen": sorted(t.qualifikationen)}
+        if t.qualifikationen
+        else {"id": t.id}
+        for t in pin.techniker
+    ]
     auftraege = [_auftrag_to_dict(a, pin.datum) for a in pin.auftraege]
+    hat_quals = any("qualifikationen" in t for t in techs_detail) or any(
+        "benoetigt" in a for a in auftraege
+    )
+    quals_hinweis = ""
+    if hat_quals:
+        quals_hinweis = (
+            "\nWICHTIG: Aufträge mit Feld `benoetigt` (z.B. ['kaelteschein'] für "
+            "Wärmepumpen) dürfen NUR Technikern zugewiesen werden, die die genannten "
+            "Qualifikationen besitzen. Ein Verstoß ist ein harter Fehler.\n"
+        )
     return (
         f"Datum: {pin.datum.isoformat()}\n\n"
-        f"TECHNIKER ({len(techs)}): {', '.join(techs)}\n\n"
+        f"TECHNIKER ({len(techs_detail)}):\n"
+        f"{json.dumps(techs_detail, ensure_ascii=False, indent=None)}\n\n"
         f"AUFTRÄGE ({len(auftraege)}):\n"
-        f"{json.dumps(auftraege, ensure_ascii=False, indent=None)}\n\n"
+        f"{json.dumps(auftraege, ensure_ascii=False, indent=None)}\n"
+        f"{quals_hinweis}\n"
         f"Erstelle den optimalen Einsatzplan mit dem Tool submit_plan."
     )
 

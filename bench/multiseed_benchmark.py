@@ -59,24 +59,37 @@ from einsatzplaner.scheduler.ortools_vrp import (
 from einsatzplaner.simulator import run_woche
 
 
-def profile_der_woche() -> list[Szenarioprofil]:
+def profile_der_woche(with_quals: bool = False) -> list[Szenarioprofil]:
     presets = Szenarioprofil.presets()
-    return [
+    tage = [
         presets["Normal"],
         presets["Hochlast"],
         presets["Notfallwoche"],
         presets["SLA-Katastrophe"],
         presets["Chaos"],
     ]
+    if with_quals:
+        from dataclasses import replace
+        tage = [
+            replace(p, kaelteschein_rate_techniker=0.4, kaelteschein_rate_auftraege=0.2)
+            for p in tage
+        ]
+    return tage
 
 
-def run_one(seed: int, scheduler_label: str, scheduler_factory, include_intraday: bool = True) -> dict:
+def run_one(
+    seed: int,
+    scheduler_label: str,
+    scheduler_factory,
+    include_intraday: bool = True,
+    with_quals: bool = False,
+) -> dict:
     montag = date(2026, 4, 20)
     rp = HaversineRouteProvider()
-    profile = profile_der_woche()
+    profile = profile_der_woche(with_quals=with_quals)
 
     rng = random.Random(seed)
-    techs = generate_techniker(10, rng)
+    techs = generate_techniker(10, rng, profil=profile[0])
     woche, profil_pro_tag = generate_multiprofil_woche(montag, profile, rng=rng)
     bekannte = {a.id: a for tag in woche.values() for a in tag}
 
@@ -150,6 +163,7 @@ def main():
     parser.add_argument("--skip-hybrid", action="store_true", help="LLM-Hybrid weglassen (spart API-Kosten)")
     parser.add_argument("--skip-intraday", action="store_true", help="stochastische Intraday-Events deaktivieren")
     parser.add_argument("--core-only", action="store_true", help="nur Heuristik + normal + naiv + Hybrid (kein chaos-safe/sla-boost)")
+    parser.add_argument("--qualifications", action="store_true", help="Kälteschein-Constraint aktivieren (40 %% Techniker, 20 %% Aufträge)")
     parser.add_argument("--llm-model", default="claude-sonnet-4-6")
     parser.add_argument("--solver-time-limit", type=int, default=4)
     parser.add_argument("--out", default="bench/results_multiseed.csv")
@@ -176,7 +190,11 @@ def main():
     all_rows: list[dict] = []
     for seed in range(args.seeds):
         for label, factory in schedulers:
-            row = run_one(seed, label, factory, include_intraday=not args.skip_intraday)
+            row = run_one(
+                seed, label, factory,
+                include_intraday=not args.skip_intraday,
+                with_quals=args.qualifications,
+            )
             all_rows.append(row)
             print(
                 f"seed={seed:02d} {label:<20} "

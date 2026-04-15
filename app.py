@@ -166,6 +166,7 @@ def _auftraege_df(auftraege, heute) -> pd.DataFrame:
                 terminart=a.terminart,
                 fenster=(f"{a.fenster_von.isoformat()}-{a.fenster_bis.isoformat()}" if a.hat_fenster else ""),
                 notfall=a.notfall,
+                kaelteschein=("✓" if "kaelteschein" in a.benoetigt_qualifikationen else ""),
                 rollover=a.rollover_count,
                 score=round(prio_score(a, heute), 1),
                 sla=a.sla_frist.isoformat() if a.sla_frist else "",
@@ -175,20 +176,25 @@ def _auftraege_df(auftraege, heute) -> pd.DataFrame:
     )
 
 
-def _tourplan_summary(tp: Tourenplan) -> pd.DataFrame:
+def _tourplan_summary(tp: Tourenplan, techs: list | None = None) -> pd.DataFrame:
+    tech_map = {t.id: t for t in techs} if techs else {}
     rows = []
     for tid, tour in tp.touren.items():
         arbeit = sum(
             s.dauer_min for s in tour.stops if s.typ == StopTyp.AUFTRAG and s.status != "storniert"
         )
         fahrt = tour.gesamt_fahrzeit_min
+        tech = tech_map.get(tid)
+        quals = ", ".join(sorted(tech.qualifikationen)) if tech and tech.qualifikationen else ""
         rows.append(
             dict(
                 techniker=tid,
+                name=tech.name if tech else "",
+                qualifikationen=quals,
                 auftraege=len(tour.auftrag_ids),
                 arbeit_min=arbeit,
                 fahrt_min=fahrt,
-                auslastung_pct=round(100 * arbeit / 420, 1),
+                auslastung_pct=round(100 * arbeit / 480, 1),
             )
         )
     return pd.DataFrame(rows)
@@ -198,10 +204,30 @@ def render_tag_mode() -> None:
     n_auftraege = st.sidebar.slider("Aufträge am Tag", 20, 80, 45)
     planungstag = st.sidebar.date_input("Planungstag", value=naechster_montag())
 
+    with st.sidebar.expander("Qualifikationen (Kälteschein)"):
+        tag_quals_aktiv = st.checkbox(
+            "Qualifikations-Constraint aktivieren",
+            value=False,
+            key="tag_quals_aktiv",
+            help="Wenn an: einige Techniker haben einen Kälteschein, einige Aufträge brauchen ihn. "
+                 "Alle Scheduler respektieren dieses Constraint hart.",
+        )
+        if tag_quals_aktiv:
+            tag_kschein_tech = st.slider("Kälteschein-Anteil Techniker (%)", 10, 80, 40, key="tag_kt")
+            tag_kschein_auf = st.slider("Kälteschein-Anteil Aufträge (%)", 0, 50, 20, key="tag_ka")
+        else:
+            tag_kschein_tech = 0
+            tag_kschein_auf = 0
+
+    tag_profil = Szenarioprofil(
+        kaelteschein_rate_techniker=tag_kschein_tech / 100,
+        kaelteschein_rate_auftraege=tag_kschein_auf / 100,
+    )
+
     if run or st.session_state.get("_last_tag") is None:
         rng = random.Random(int(seed))
-        techs = generate_techniker(n_techs, rng)
-        auftraege = generate_auftraege(int(n_auftraege), planungstag, rng=rng)
+        techs = generate_techniker(n_techs, rng, profil=tag_profil)
+        auftraege = generate_auftraege(int(n_auftraege), planungstag, rng=rng, profil=tag_profil)
         rp = HaversineRouteProvider()
         sched = _build_scheduler()
         with st.spinner(f"Planung mit {sched.name}…"):
@@ -235,7 +261,7 @@ def render_tag_mode() -> None:
     with tab3:
         _render_map(tp, auftraege_by_id)
     with tab4:
-        st.dataframe(_tourplan_summary(tp), width="stretch")
+        st.dataframe(_tourplan_summary(tp, techs=techs_state), width="stretch")
 
 
 def _events_df(we: WochenErgebnis) -> pd.DataFrame:
@@ -284,6 +310,49 @@ def _profil_slider() -> Szenarioprofil:
             "Rollover-Altlast (Aufträge)", 0, 40, int(base.rollover_vorbelastung), key=f"ro_{key_suffix}",
             help="Wieviel überfällige Aufträge (rollover_count 1-3) am Montag schon im Backlog sind.",
         )
+        st.markdown("**Arbeitszeit-Modell**")
+        ueberstunden_aktiv = st.checkbox(
+            "Überstunden erlaubt (ArbZG-Ausnahme)",
+            value=(base.tages_netto_min > 480),
+            key=f"ovt_{key_suffix}",
+            help="Normal: 8h netto/Tag, 40h/Woche. Mit Überstunden: bis 10h/Tag, bis 60h/Woche. "
+                 "Entspricht ArbZG §3: werktäglich 8h, vorübergehend auf 10h ausdehnbar.",
+        )
+        if ueberstunden_aktiv:
+            tages_netto = st.slider(
+                "Max. Nettoarbeit pro Tag (h)", 8, 10, int(base.tages_netto_min / 60) if base.tages_netto_min > 480 else 10,
+                key=f"tn_{key_suffix}",
+            ) * 60
+            wochen_netto_max = st.slider(
+                "Max. Nettoarbeit pro Woche (h)", 40, 60, int(base.wochen_netto_max_min / 60) if base.wochen_netto_max_min > 2400 else 50,
+                key=f"wn_{key_suffix}",
+            ) * 60
+        else:
+            tages_netto = 480
+            wochen_netto_max = 2400
+
+        st.markdown("**Qualifikationen (Kälteschein für Wärmepumpen)**")
+        quals_aktiv = st.checkbox(
+            "Qualifikations-Constraint aktivieren",
+            value=(base.kaelteschein_rate_techniker > 0 or base.kaelteschein_rate_auftraege > 0),
+            key=f"qa_{key_suffix}",
+            help="Wenn an: einige Techniker haben einen Kälteschein, einige Aufträge brauchen ihn. "
+                 "Alle Scheduler respektieren dieses Constraint hart.",
+        )
+        if quals_aktiv:
+            kschein_tech = st.slider(
+                "Kälteschein-Anteil Techniker (%)", 10, 80,
+                int((base.kaelteschein_rate_techniker or 0.4) * 100),
+                key=f"kt_{key_suffix}",
+            )
+            kschein_auf = st.slider(
+                "Kälteschein-Anteil Aufträge (%)", 0, 50,
+                int((base.kaelteschein_rate_auftraege or 0.2) * 100),
+                key=f"ka_{key_suffix}",
+            )
+        else:
+            kschein_tech = 0
+            kschein_auf = 0
         st.caption(
             f"Dringlichkeit-Gewichte (niedrig/mittel/hoch): {base.dringlichkeit_gewichte}"
         )
@@ -294,6 +363,10 @@ def _profil_slider() -> Szenarioprofil:
         ueberlast_pct=ueberlast,
         rollover_vorbelastung=rollover,
         dringlichkeit_gewichte=base.dringlichkeit_gewichte,
+        kaelteschein_rate_techniker=kschein_tech / 100,
+        kaelteschein_rate_auftraege=kschein_auf / 100,
+        tages_netto_min=int(tages_netto),
+        wochen_netto_max_min=int(wochen_netto_max),
     )
 
 
@@ -337,7 +410,7 @@ def render_woche_mode() -> None:
         techs_global = None
         for label, sched in scheduler_list:
             rng_local = random.Random(int(seed))
-            techs_local = generate_techniker(n_techs, rng_local)
+            techs_local = generate_techniker(n_techs, rng_local, profil=profil)
             woche_local = generate_woche(
                 start_montag,
                 rng=rng_local,

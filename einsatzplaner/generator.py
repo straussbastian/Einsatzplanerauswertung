@@ -8,6 +8,7 @@ from datetime import date, datetime, time, timedelta
 from .models import (
     BETRIEBSHOF_LAT,
     BETRIEBSHOF_LON,
+    QUAL_KAELTESCHEIN,
     Auftrag,
     Dringlichkeit,
     Techniker,
@@ -27,6 +28,12 @@ class Szenarioprofil:
     intraday_verlaengerung_rate: float = 0.0  # P(Auftrag verlängert sich ungeplant), pro Auftrag
     intraday_absage_rate: float = 0.0  # P(Kunde sagt spontan ab), pro Auftrag
     intraday_stau_rate: float = 0.0  # P(Stau irgendwo heute), pro Tag
+    # Qualifikationen (Kälteschein für Wärmepumpen) — wenn beide 0, inaktiv
+    kaelteschein_rate_techniker: float = 0.0  # Anteil Techniker mit Kälteschein
+    kaelteschein_rate_auftraege: float = 0.0  # Anteil Aufträge, die Kälteschein erfordern
+    # Arbeitszeit-Caps (Default = gesetzlicher Normalfall 8h/Tag)
+    tages_netto_min: int = 480  # max. Netto-Arbeitszeit pro Techniker pro Tag (480=8h, 600=10h mit Überstunden)
+    wochen_netto_max_min: int = 2400  # max. Netto-Arbeitszeit pro Techniker pro Woche (2400=40h, 3600=60h mit Überstunden)
 
     @classmethod
     def presets(cls) -> dict[str, "Szenarioprofil"]:
@@ -93,13 +100,50 @@ def _random_point_in_radius(center_lat: float, center_lon: float, max_km: float,
     return center_lat + dlat, center_lon + dlon
 
 
-def generate_techniker(n: int = 10, rng: random.Random | None = None) -> list[Techniker]:
+def generate_techniker(
+    n: int = 10,
+    rng: random.Random | None = None,
+    profil: "Szenarioprofil | None" = None,
+) -> list[Techniker]:
     rng = rng or random.Random(42)
-    techniker = []
+    profil = profil or Szenarioprofil()
+    # Schichtende dynamisch aus Profil: 8:00 + Netto + 60 min Pausen
+    beginn = time(8, 0)
+    brutto_min = profil.tages_netto_min + 60
+    ende_min_gesamt = beginn.hour * 60 + beginn.minute + brutto_min
+    schichtende = time(ende_min_gesamt // 60 % 24, ende_min_gesamt % 60)
+    techniker: list[Techniker] = []
     for i in range(n):
         vorname = rng.choice(VORNAMEN)
         nachname = rng.choice(NACHNAMEN)
-        techniker.append(Techniker(id=f"T{i+1:02d}", name=f"{vorname} {nachname}"))
+        quals: set[str] = set()
+        if profil.kaelteschein_rate_techniker > 0 and rng.random() < profil.kaelteschein_rate_techniker:
+            quals.add(QUAL_KAELTESCHEIN)
+        techniker.append(
+            Techniker(
+                id=f"T{i+1:02d}",
+                name=f"{vorname} {nachname}",
+                schichtbeginn=beginn,
+                schichtende=schichtende,
+                qualifikationen=frozenset(quals),
+            )
+        )
+    # Sicherheitsnetz: wenn Aufträge Kälteschein erfordern werden, brauchen wir
+    # mindestens 1 qualifizierten Techniker, sonst wird das Szenario infeasible.
+    if profil.kaelteschein_rate_auftraege > 0 and profil.kaelteschein_rate_techniker > 0:
+        if not any(QUAL_KAELTESCHEIN in t.qualifikationen for t in techniker):
+            idx = rng.randrange(n)
+            t = techniker[idx]
+            techniker[idx] = Techniker(
+                id=t.id, name=t.name, home_lat=t.home_lat, home_lon=t.home_lon,
+                schichtbeginn=t.schichtbeginn, schichtende=t.schichtende,
+                pause_fruehstueck_min=t.pause_fruehstueck_min,
+                pause_mittag_min=t.pause_mittag_min,
+                max_arbeit_ohne_pause_min=t.max_arbeit_ohne_pause_min,
+                mittag_fenster_von=t.mittag_fenster_von,
+                mittag_fenster_bis=t.mittag_fenster_bis,
+                qualifikationen=frozenset({QUAL_KAELTESCHEIN}),
+            )
     return techniker
 
 
@@ -166,6 +210,10 @@ def generate_auftraege(
         else:
             sla_frist = _sla_frist_fuer(dringlichkeit, tag, rng)
 
+        benoetigt: set[str] = set()
+        if profil.kaelteschein_rate_auftraege > 0 and rng.random() < profil.kaelteschein_rate_auftraege:
+            benoetigt.add(QUAL_KAELTESCHEIN)
+
         auftraege.append(
             Auftrag(
                 id=f"A{seq_start + i:04d}",
@@ -181,6 +229,7 @@ def generate_auftraege(
                 fenster_bis=fenster_bis,
                 sla_frist=sla_frist,
                 notfall=notfall,
+                benoetigt_qualifikationen=frozenset(benoetigt),
             )
         )
     return auftraege
