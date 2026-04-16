@@ -653,30 +653,38 @@ Dieselbe Multi-Profil-Woche wie oben, aber mit aktiviertem Replan-Trigger. Krank
 
 Rohdaten: `bench/results_replan_preview.csv` (dumb), `bench/results_replan_context.csv` (Context).
 
-### 12.4 Qualifikations-Constraint, 10 Seeds (mit 8h-Arbeitszeit)
+### 12.4 Qualifikations-Constraint, 30 Seeds (mit 8h-Arbeitszeit)
 
 Kälteschein-Constraint: 40 % der Techniker haben ihn, 20 % der Aufträge erfordern ihn. Alle Scheduler respektieren das Constraint hart.
 
-**Baseline (8h, ohne Quals):**
+Der ursprüngliche 10-Seed-Lauf hatte ein scheinbar positives Hybrid-Signal gezeigt (+0.13 pp, −0.01 pp Constraint-Verlust). Der 30-Seed-Absicherungslauf widerlegt diese Richtung.
+
+**Baseline (8h, ohne Quals, 30 Seeds):**
 
 | Scheduler | Completion | SLA-Vlz | Fahrzeit |
 |---|---|---|---|
-| Heuristik | 64.90 % ± 1.44 | 23.2 ± 5.4 | 6203 ± 110 |
-| OR-Tools naiv | 74.05 % ± 2.45 | 13.3 ± 2.9 | 4597 ± 228 |
-| **OR-Tools normal** | **74.54 % ± 2.04** | 14.3 ± 3.3 | 4609 ± 196 |
-| Hybrid | 74.50 % ± 2.29 | 14.4 ± 3.5 | 4624 ± 261 |
+| Heuristik | 63.71 % ± 2.83 | 25.3 ± 4.7 | 6213 ± 208 |
+| OR-Tools naiv | 73.55 % ± 2.91 | 14.7 ± 4.6 | 4603 ± 299 |
+| OR-Tools normal | 73.70 % ± 2.74 | 16.6 ± 4.9 | 4575 ± 255 |
+| **Hybrid** | **73.77 % ± 2.91** | 14.7 ± 4.6 | 4649 ± 299 |
 
-**Mit Qualifikations-Constraint:**
+**Mit Qualifikations-Constraint (30 Seeds):**
 
 | Scheduler | Completion | SLA-Vlz | Fahrzeit |
 |---|---|---|---|
-| Heuristik | 64.49 % ± 2.88 | 21.9 ± 3.4 | 6242 ± 353 |
-| OR-Tools naiv | 73.50 % ± 2.28 | 15.0 ± 5.5 | 4618 ± 240 |
-| OR-Tools normal | 74.36 % ± 2.62 | 15.2 ± 5.7 | 4687 ± 303 |
-| **Hybrid** | **74.49 % ± 2.68** | 15.0 ± 5.2 | 4789 ± 324 |
+| Heuristik | 63.50 % ± 3.00 | 23.4 ± 4.8 | 6198 ± 297 |
+| OR-Tools naiv | 73.12 % ± 3.41 | 16.9 ± 5.2 | 4699 ± 291 |
+| **OR-Tools normal** | **74.18 % ± 2.83** | 16.9 ± 5.6 | 4758 ± 304 |
+| Hybrid | 73.63 % ± 3.05 | 16.8 ± 4.7 | 4722 ± 267 |
 
-**Δ Completion (ohne → mit Quals):** Heuristik −0.41 pp, OR-Tools-naiv −0.55 pp, OR-Tools-normal −0.18 pp, **Hybrid −0.01 pp**.
+**Δ Completion (ohne → mit Quals):** Heuristik −0.21 pp, OR-Tools-naiv −0.43 pp, **OR-Tools-normal +0.48 pp** (nominell gewonnen), Hybrid −0.14 pp.
 
-**Befund:** Erstmals nominell Hybrid vor OR-Tools-normal (+0.13 pp). Der Hybrid verliert am wenigsten durch das Constraint. Statistisch noch nicht signifikant (n=10), aber die Richtung ist konsistent und bestätigt die §8-Limitationen-These, dass LLM-Adaption relevanter wird, sobald das Problem mehrdimensional wird.
+**Befund:** Der 10-Seed-Pilotsignal-Eindruck ist nicht reproduzierbar. Mit 30 Seeds liegt OR-Tools-normal nominell +0.55 pp vor dem Hybrid (statt −0.18 pp wie bei 10 Seeds). Statistisch: Stdev ±2.74–3.41 pp, SEM ≈ 0.53 pp, der 0.55-pp-Abstand entspricht t ≈ 1.0, p ≈ 0.3 — **nicht signifikant**. Die korrekte Aussage aus der 30-Seed-Absicherung ist nicht „OR-Tools schlägt Hybrid bei Quals", sondern „kein detektierbarer Effekt in beide Richtungen — auch die nominelle Gegenrichtung ist nicht reproduzierbar". Die in §8 vermutete Hypothese „LLM-Adaption gewinnt mit zusätzlichen Zuordnungs-Dimensionen" ist in dieser Ausprägung **nicht belegt**.
 
-Rohdaten: `bench/results_baseline_8h.csv`, `bench/results_qualifications.csv`.
+Historische 10-Seed-Zahlen (archiviert):
+- Baseline: OR-Tools-normal 74.54 % ± 2.04, Hybrid 74.50 % ± 2.29
+- Mit Quals: OR-Tools-normal 74.36 % ± 2.62, Hybrid 74.49 % ± 2.68
+
+Die 10-Seed-Werte sind durchgängig ~0.8 pp höher als die 30-Seed-Werte — ein zusätzlicher Hinweis, dass der ursprüngliche Seed-Pool sich zufällig in einem günstigen Bereich bewegte.
+
+Rohdaten: `bench/results_baseline_30seeds.csv`, `bench/results_qualifications_30seeds.csv` (belastbar). Archiv: `bench/results_baseline_8h.csv`, `bench/results_qualifications.csv` (10 Seeds, Pilot).

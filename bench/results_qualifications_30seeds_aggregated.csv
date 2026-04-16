@@ -1,0 +1,5 @@
+scheduler,n_seeds,completion_mean,completion_std,prio_completion_mean,prio_completion_std,sla_vlz_mean,sla_vlz_std,fahrzeit_mean,fahrzeit_std,laufzeit_mean
+heuristik,30,63.5,3.0,73.48,2.59,23.43,4.8,6198.1,296.5,0.0
+ortools-naiv,30,73.12,3.41,77.25,3.41,16.87,5.19,4699.23,291.28,34.98
+ortools-normal,30,74.18,2.83,78.35,2.75,16.87,5.56,4757.53,304.09,34.77
+hybrid,30,73.63,3.05,77.27,3.16,16.83,4.65,4722.3,267.33,146.27

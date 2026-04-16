@@ -10,23 +10,23 @@
 
 Wir vergleichen vier Verfahren zur täglichen Zuweisung von Wartungsaufträgen auf zehn Servicetechniker eines fiktiven Heizungsbaubetriebs in Oldenburg: eine **Insertion-Heuristik**, einen **OR-Tools VRPTW-Solver** mit statischen Priorisierungs-Gewichten, einen **LLM-Direct-Scheduler** (Claude Sonnet 4.6 entscheidet Zuordnung und Reihenfolge) und einen **Hybrid-Ansatz** (LLM setzt tagesaktuelle Priorisierungs-Gewichte, OR-Tools optimiert darauf).
 
-**Kernbotschaft in zwei Sätzen:** _In geografisch dominierten, constraint-armen Tourenplanungs-Problemen ist ein gut konstruierter klassischer Algorithmus (OR-Tools VRPTW) dem LLM-gestützten Hybrid ebenbürtig bis marginal überlegen — LLM-Augmentation liefert keinen messbaren Mehrwert. Erst wenn eine zweite harte Zuordnungs-Dimension hinzukommt (Skill-Matching), zeigt sich ein erster — noch nicht statistisch signifikanter, aber konsistent gerichteter — Hybrid-Vorteil._
+**Kernbotschaft in einem Satz:** _Ein vernünftig konstruierter klassischer VRPTW-Solver (OR-Tools) ist in dieser Domäne dem LLM-gestützten Hybrid durchgehend ebenbürtig bis marginal überlegen — über vier unabhängige Testsetups (inklusive Skill-Heterogenität, 30 Seeds) lässt sich keine Bedingung identifizieren, in der LLM-Augmentation einen statistisch signifikanten Performance-Vorteil liefert._
 
 Unter kontrollierten Einzelprofil-Bedingungen dominiert der **OR-Tools-Solver** mit statischen Gewichten — +11 Prozentpunkte Completion gegenüber der Heuristik bei gleichzeitig 15 % geringerer Gesamtfahrzeit. Der **LLM-Direct-Ansatz** schneidet in allen Messgrößen schlechter ab und zeigt die bekannte Schwäche von LLMs bei großen kombinatorischen Optimierungsproblemen.
 
-Der methodisch belastbare Haupttest ist in vier Stufen aufgebaut, von denen jede eine spezifische Hybrid-Hypothese prüft:
+Der methodisch belastbare Haupttest ist in vier Stufen aufgebaut, von denen jede eine spezifische Hybrid-Hypothese prüft — alle vier widerlegen sie:
 
-1. **Multi-Profil-Woche mit 20 Seeds (§5.5).** Getestet gegen vier statische Kalibrierungen (`naiv`, `normal`, `chaos-safe`, `sla-boost`). Der Hybrid liegt in Completion, SLA-Verletzungen und Fahrzeit **innerhalb einer Standardabweichung** gegenüber allen vier — auch gegenüber der bewusst schwachen `naiv`-Variante. Die Hypothese „Hybrid schützt vor schlechter Kalibrierung" ist **nicht belegt**, weil OR-Tools im getesteten Bereich robust gegen Penalty-Variation ist.
+1. **Multi-Profil-Woche mit 20 Seeds (§5.5).** Getestet gegen vier statische Kalibrierungen (`naiv`, `normal`, `chaos-safe`, `sla-boost`). Der Hybrid liegt in Completion, SLA-Verletzungen und Fahrzeit **innerhalb einer Standardabweichung** gegenüber allen vier — auch gegenüber der bewusst schwachen `naiv`-Variante. Die Hypothese „Hybrid schützt vor schlechter Kalibrierung" ist nicht belegt, weil OR-Tools im getesteten Bereich robust gegen Penalty-Variation ist.
 
-2. **Replan-Test (§5.6, 10 Seeds).** Intraday-Störungen (Krankmeldung, Notfall, Stau, Auftragsverlängerung) triggern einen Replan. Alle Scheduler können neu planen. Auch hier **kein signifikanter Hybrid-Vorteil** — im Gegenteil, OR-Tools und Hybrid verlieren beide leicht durch den Replan (−1.3 pp Completion), während die Heuristik als einzige gewinnt (+2.9 pp), weil sie vorher überhaupt keine Umverteilung nach Ereignissen gemacht hat.
+2. **Replan-Test (§5.6, 10 Seeds).** Intraday-Störungen (Krankmeldung, Notfall, Stau, Auftragsverlängerung) triggern einen Replan. Alle Scheduler können neu planen. **Kein signifikanter Hybrid-Vorteil** — OR-Tools und Hybrid verlieren beide leicht durch den Replan (−1.3 pp Completion), während die Heuristik als einzige gewinnt (+2.9 pp).
 
-3. **Replan mit Tagesverlauf-Kontext (§5.6).** Der Hybrid bekommt zusätzlich strukturierte Tagesverlauf-Daten. **Kein Mittelwert-Gewinn** gegenüber „Replan ohne Kontext". Einziger messbarer Effekt: die Run-zu-Run-Streuung des Hybrid sinkt (Completion-Stdev von ±2.43 auf ±1.73). Das LLM verarbeitet den Kontext nachweislich, ohne dass sich daraus ein Performance-Hebel ergibt.
+3. **Replan mit Tagesverlauf-Kontext (§5.6).** Der Hybrid bekommt zusätzlich strukturierte Tagesverlauf-Daten. **Kein Mittelwert-Gewinn** gegenüber „Replan ohne Kontext". Einziger messbarer Effekt: die Run-zu-Run-Streuung des Hybrid sinkt (Completion-Stdev von ±2.43 auf ±1.73).
 
-4. **Qualifikations-Constraint (§5.7, 10 Seeds).** Kälteschein für 40 % der Techniker, 20 % der Aufträge erfordern ihn. **Erstmals nominell Hybrid auf Platz 1**: +0.13 pp Completion gegenüber OR-Tools-normal (Baseline ohne Constraint: OR-Tools-normal +0.04 pp vorn). Und: der Hybrid verliert mit −0.01 pp am wenigsten durch das Constraint, während OR-Tools-naiv um −0.55 pp und OR-Tools-normal um −0.18 pp fallen. Die Richtung ist **konsistent**, die absolute Differenz bleibt aber im Rauschen.
+4. **Qualifikations-Constraint (§5.7, 30 Seeds).** Kälteschein für 40 % der Techniker, 20 % der Aufträge erfordern ihn. Ein 10-Seed-Pilotlauf zeigte einen nominellen Hybrid-Vorteil (+0.13 pp, als „richtungsweisend, nicht signifikant" eingeordnet). Der 30-Seed-Absicherungslauf reproduziert diese Richtung **nicht**: nominell liegt jetzt OR-Tools-normal +0.55 pp vorn, aber dieser Abstand liegt selbst bei n=30 noch im Rauschen (Stdev ±2.83–3.05 pp, SEM ≈ 0.53 pp, t ≈ 1.0, p ≈ 0.3). Die korrekte Aussage nach Absicherung ist deshalb nicht „OR-Tools schlägt Hybrid bei Quals", sondern **„kein detektierbarer Effekt in beide Richtungen"** — das 10-Seed-Pro-Hybrid-Signal ist bei 30 Seeds genauso wenig reproduzierbar wie ein Pro-OR-Tools-Signal.
 
-**Konsequenz:** In den ersten drei Testsetups — alle bei geografisch dominierten, constraint-armen Problemstrukturen — liefert der Hybrid keinen Performance-Vorteil gegenüber einem statisch kalibrierten OR-Tools-Solver. Erst der vierte Test mit Qualifikations-Constraint (einer zweiten harten Zuordnungs-Dimension) zeigt ein **erstes positives Signal** für den Hybrid — statistisch noch nicht signifikant, aber richtungsweisend und konsistent mit der in §8 skizzierten These, dass LLM-Adaption Wert gewinnt, je mehrdimensionaler der Trade-off wird. Der Hauptbefund ist damit **nicht mehr universell negativ**, sondern **domänenspezifisch differenziert**: klassischer Algorithmus dominiert im constraint-armen Fall, Hybrid wird konkurrenzfähig bei Skill-Heterogenität.
+**Konsequenz:** In allen vier Testsetups liefert der Hybrid **keinen statistisch signifikanten Performance-Vorteil** gegenüber einem vernünftig kalibrierten OR-Tools-Solver — auch nicht im ursprünglich als „letzte Bastion" vermuteten Fall der Skill-Heterogenität. Der Wertschlüssel des Hybrid reduziert sich auf das strukturelle Mittelstand-Argument in §6: Ersatz einer Kalibrierungs-Entscheidung, die der Endnutzer nicht explizit trifft. Performance-Zahlen rechtfertigen LLM-Augmentation in dieser Domäne nicht.
 
-Der frühere Einzel-Seed-Befund (+1 Auftrag, −4 SLA im Chaos) hat sich unter statistischer Absicherung **nicht bestätigt** und ist in §5.3 als anekdotisch markiert.
+Zwei frühere Einzel-Seed-Befunde haben sich unter statistischer Absicherung **nicht bestätigt**: +1 Auftrag, −4 SLA im Chaos (§5.3) und +0.13 pp im Qualifikations-Pilotlauf (§5.7.1). Beide sind im Report als anekdotisch bzw. nicht reproduzierbar markiert. Beide zeigen, warum Seed-Absicherung in dieser Art Experiment nicht optional ist — richtungsweisende Signale können bei n≤10 reines Rauschen sein, selbst wenn sie vorsichtig als „nicht signifikant, aber konsistent gerichtet" interpretiert werden.
 
 ---
 
@@ -572,36 +572,62 @@ Um diesen Test durchzuführen, wurden drei zusätzliche Subsysteme implementiert
 
 Rohdaten: `bench/results_replan_preview.csv` (dumb), `bench/results_replan_context.csv` (Context). Reasoning-Ausgaben des LLM zeigen im Mittel, dass der Kontext **gelesen und artikuliert** wird („3. Replan heute, ausgelöst durch Auftragsverlängerung, alle Techniker noch 150 min Restschicht, …") — das LLM ignoriert die Information nicht strukturell, nutzt sie aber offenbar ohne messbaren Ergebnis-Einfluss. Dieser Befund wiegt schwerer als eine stille Nicht-Nutzung, weil er zeigt: die Information kommt an, aber sie hat keinen Hebel auf die Entscheidung im hier getesteten Betriebsfenster.
 
-### 5.7 Qualifikations-Constraint: öffnet das den Hybrid-Spielraum?
+### 5.7 Qualifikations-Constraint: 10-Seed-Pilotsignal bei 30 Seeds nicht reproduzierbar
 
-In §8 (Limitationen) hatten wir identifiziert, dass unsere bisherigen Tests das Problem geografisch dominieren — eine dominante Lösungsstrategie (Clustering + Prio) macht alle vernünftigen Scheduler ähnlich gut. Um zu prüfen, ob eine zweite Zuordnungs-Dimension den Hybrid-Vorteil aktiviert, wurde ein **Qualifikations-Constraint** eingeführt: 40 % der Techniker haben einen **Kälteschein**, 20 % der Aufträge **erfordern** ihn (Wärmepumpen-Wartung). Das ist ein realistisches Szenario für Heizungsbetriebe, die Wärmepumpen im Portfolio haben aber nicht als Schwerpunkt.
+In §8 (Limitationen) war der Verdacht geäußert worden, dass unsere Tests das Problem geografisch dominieren — eine dominante Lösungsstrategie (Clustering + Prio) macht alle Scheduler ähnlich gut. Um zu prüfen, ob eine zweite harte Zuordnungs-Dimension den Hybrid-Vorteil aktiviert, wurde ein **Qualifikations-Constraint** eingeführt: 40 % der Techniker haben einen **Kälteschein**, 20 % der Aufträge **erfordern** ihn (Wärmepumpen-Wartung).
 
-**Constraint-Umsetzung:** Das Constraint wird von allen vier Schedulern **hart** respektiert. Heuristik: `_try_assign` gibt `None` zurück bei unqualifiziertem Techniker. OR-Tools: `routing.VehicleVar(node).SetValues([vid für qualifizierte Fahrzeuge])` sperrt den Knoten. LLM-Direct: Prompt enthält Qualifikationen, plus zusätzlich Constraint-Check in der Tour-Konstruktion. Hybrid: nutzt OR-Tools-Constraint unter der Haube.
+**Constraint-Umsetzung:** Alle vier Scheduler respektieren das Constraint **hart**. Heuristik: `_try_assign` gibt `None` zurück bei unqualifiziertem Techniker. OR-Tools: `routing.VehicleVar(node).SetValues([vid für qualifizierte Fahrzeuge])`. LLM-Direct: Prompt enthält Qualifikationen + Tour-Check. Hybrid: nutzt OR-Tools-Constraint unter der Haube.
 
-**Test-Setup:** Dieselbe Multi-Profil-Woche (Normal–Hochlast–Notfallwoche–SLA-Katastrophe–Chaos), dieselbe 8 h-Nettoarbeitszeit, dieselben Seeds. Einziger Unterschied: Qualifikations-Constraint an/aus.
+**Test-Setup:** Dieselbe Multi-Profil-Woche wie §5.5, dieselbe 8 h-Nettoarbeitszeit. Einziger Unterschied: Qualifikations-Constraint an/aus.
 
-**Vergleichstabelle (10 Seeds, Mittelwert ± Stdev):**
+#### 5.7.1 Erster Lauf (10 Seeds) — scheinbar positives Signal
 
-| Scheduler | Baseline (ohne Quals) | Mit Qualifikations-Constraint | Δ Completion |
-|---|---|---|---|
-| Heuristik | 64.90 % ± 1.44 · SLA 23.2 | 64.49 % ± 2.88 · SLA 21.9 | −0.41 pp |
-| OR-Tools naiv | 74.05 % ± 2.45 · SLA 13.3 | 73.50 % ± 2.28 · SLA 15.0 | −0.55 pp |
-| **OR-Tools normal** | **74.54 % ± 2.04** · SLA 14.3 | 74.36 % ± 2.62 · SLA 15.2 | −0.18 pp |
-| **Hybrid** | 74.50 % ± 2.29 · SLA 14.4 | **74.49 % ± 2.68** · SLA 15.0 | **−0.01 pp** |
+| Scheduler | Baseline (ohne Quals) | Mit Qualifikations-Constraint |
+|---|---|---|
+| OR-Tools normal | **74.54 % ± 2.04** | 74.36 % ± 2.62 |
+| Hybrid | 74.50 % ± 2.29 | **74.49 % ± 2.68** |
 
-**Drei Beobachtungen, alle richtungsweisend und alle statistisch noch nicht signifikant:**
+Der erste Lauf mit 10 Seeds zeigte ein scheinbar interessantes Bild: Hybrid rückt im Qualifikations-Fall nominell vor OR-Tools (+0.13 pp), und der Hybrid verliert mit −0.01 pp am wenigsten durch das Constraint, während OR-Tools-naiv −0.55 pp und OR-Tools-normal −0.18 pp einbüßen. Die Richtung wirkte konsistent mit der §8-These „LLM-Adaption gewinnt Wert bei höherer Problem-Dimensionalität".
 
-1. **Der Hybrid wandert nominell auf Platz 1** — nur wenn Qualifikationen aktiv sind. Baseline: OR-Tools-normal +0.04 pp vorn. Mit Qualifikationen: Hybrid +0.13 pp vorn. Die absolute Differenz bleibt klein (<1 Standardabweichung), aber die **Rangfolge dreht sich** konsistent. In allen drei früheren Testsetups (§5.5, §5.6) war OR-Tools-normal oder sla-boost immer vorn.
+Wir haben das im ersten Bericht als **schwaches positives Signal** gekennzeichnet — statistisch nicht signifikant (<1 Stdev), aber konsistent gerichtet. Ausdrücklich mit dem Hinweis, dass 30 Seeds Klärung bringen sollten.
 
-2. **Der Hybrid verliert am wenigsten durch das Constraint.** OR-Tools-naiv fällt um −0.55 pp zurück, OR-Tools-normal um −0.18 pp, Hybrid praktisch nicht (−0.01 pp). Das ist konsistent mit der Hypothese: wenn das Constraint die Kapazität der qualifizierten Techniker knapper macht (20 % Schein-Aufträge auf 40 % Techniker → 50 % Belastung der qualifizierten), ist eine tagesaktuelle Gewichts-Adaption des Prio-Scores wertvoller als bei breit austauschbaren Technikern.
+#### 5.7.2 Reproduktion (30 Seeds) — Pilotsignal nicht reproduzierbar
 
-3. **Absolut betrachtet ist der Effekt klein.** Die 0.17-pp-Verschiebung (Hybrid-Position gegenüber OR-Tools-normal) liegt deutlich innerhalb der einen Standardabweichung (±2.0 bis ±2.7 pp). Mit 10 Seeds können wir nicht sagen, ob das ein echtes Signal oder Seed-Rauschen ist. Bei 30 Seeds wäre die Konfidenz etwa verdoppelt — wir haben das aus Kostengründen nicht durchgeführt.
+Der 30-Seed-Lauf im Folgenachts-Zyklus reproduziert die 10-Seed-Richtung nicht:
 
-**Konsequenz für die Gesamthypothese:**
+| Scheduler | Baseline (ohne Quals, 30 Seeds) | Mit Qualifikations-Constraint (30 Seeds) |
+|---|---|---|
+| Heuristik | 63.71 % ± 2.83 · SLA 25.3 | 63.50 % ± 3.00 · SLA 23.4 |
+| OR-Tools naiv | 73.55 % ± 2.91 · SLA 14.7 | 73.12 % ± 3.41 · SLA 16.9 |
+| OR-Tools normal | 73.70 % ± 2.74 · SLA 16.6 | **74.18 % ± 2.83** · SLA 16.9 |
+| **Hybrid** | **73.77 % ± 2.91** · SLA 14.7 | 73.63 % ± 3.05 · SLA 16.8 |
 
-Der Qualifikations-Test ist das **erste Testsetup**, in dem der Hybrid nicht hinter OR-Tools liegt. Die Richtung bestätigt die §8-Limitationen-These: in geografisch dominierten, constraint-armen Problemen ist die algorithmische Lösung robust und LLM-Adaption irrelevant; sobald eine zweite Zuordnungs-Dimension ins Spiel kommt, zeigt sich ein (noch nicht signifikanter, aber konsistenter) Hybrid-Vorteil. Das **invalidiert den §7.0-Kernbefund nicht** — „gute Algorithmen schlagen die KI" gilt für die getesteten Szenarien weiterhin. Aber es verschiebt die Grenze: der Befund ist **nicht universell**, sondern gebunden an constraint-arme Problemstrukturen.
+**Die nominellen Rangfolgen drehen sich gegenüber dem 10-Seed-Lauf um — beide Richtungen im Rauschen:**
 
-Rohdaten: `bench/results_baseline_8h.csv` (ohne Quals), `bench/results_qualifications.csv` (mit Quals). Aggregationen in den entsprechenden `_aggregated.csv`.
+| Vergleich | 10 Seeds | 30 Seeds |
+|---|---|---|
+| Hybrid vs. OR-Tools-normal, ohne Quals | OR-Tools +0.04 pp | Hybrid +0.07 pp |
+| Hybrid vs. OR-Tools-normal, mit Quals | Hybrid +0.13 pp | OR-Tools +0.55 pp |
+| Δ Hybrid durch Quals | −0.01 pp | −0.14 pp |
+| Δ OR-Tools-normal durch Quals | −0.18 pp | +0.48 pp |
+
+**Statistische Einordnung des 30-Seed-Laufs:** Stdev je Zelle ±2.83–3.41 pp → SEM ≈ 0.53–0.62 pp. Der nominelle OR-Tools-Vorsprung von 0.55 pp mit Quals liegt bei etwa 1 SEM, t ≈ 1.0, p ≈ 0.3. Das ist **nicht signifikant**. Keiner der gezeigten 30-Seed-Abstände erreicht Signifikanz (alle nominellen Effekte bleiben < 1 pp bei ±3 pp Streuung).
+
+Die ehrliche Aussage ist deshalb nicht „OR-Tools schlägt jetzt den Hybrid bei Quals". Sie lautet:
+
+- Das 10-Seed-Pro-Hybrid-Signal (+0.13 pp) ist bei 30 Seeds **nicht reproduzierbar**.
+- Die 30-Seed-Nominal-Richtung (+0.55 pp Pro-OR-Tools) ist selbst bei n=30 **ebenfalls nicht signifikant**.
+- Was die Absicherung tatsächlich belegt: **es gibt in diesem Setup keinen detektierbaren Effekt in irgendeine Richtung**. Das 10-Seed-Signal war eine zufällige Rauschausprägung, die bei Verdopplung der Seed-Zahl sogar das Vorzeichen wechselt.
+
+**Konsequenz:**
+
+1. **Die Hybrid-Hypothese bleibt auch bei Skill-Heterogenität unbestätigt.** Die §8-Spekulation, dass mehrdimensionale Constraints dem Hybrid einen echten Hebel geben, ist damit für die hier getesteten Bedingungen **nicht nachgewiesen**. Der Hybrid liegt auch mit Qualifikations-Constraint im statistischen Rauschen gegen einen vernünftig kalibrierten OR-Tools-Solver — und umgekehrt gilt dasselbe.
+
+2. **Lessons Learned zur Methodik.** Der 10-Seed-Lauf produzierte einen zufallsbedingten Richtungseffekt, den wir vorsichtig als „konsistent gerichtet, nicht signifikant" eingeordnet hatten. Die 30-Seed-Absicherung zeigt: auch solche vorsichtigen Interpretationen können trügerisch sein, wenn die Seed-Zahl zu klein ist. In Zukunft: bei richtungsrelevanten Signalen, deren Absolutwert unter einer Stdev liegt, mindestens 30 Seeds — lieber 50. Wir haben den ursprünglichen §5.7-Befund bewusst als „schwaches Signal" eingeordnet — das reicht für den Bericht nicht aus, wenn der Befund die Kernthese berührt.
+
+3. **Die §7.0-Quintessenz gilt damit durchgehend.** Alle vier Testsetups — inklusive des vorher hoffnungsvollen §5.7 — zeigen: in dieser Domäne liefert LLM-Augmentation keinen messbaren Performance-Vorteil gegenüber einem vernünftig kalibrierten OR-Tools-Solver. Der Effekt ist weder bei variierenden Lastprofilen, noch bei intraday Replan-Dynamik, noch bei Tagesverlauf-Kontext, noch bei Skill-Heterogenität sichtbar.
+
+Rohdaten: `bench/results_baseline_8h.csv` / `bench/results_qualifications.csv` (10 Seeds, archiviert) und `bench/results_baseline_30seeds.csv` / `bench/results_qualifications_30seeds.csv` (30 Seeds, belastbar).
 
 ## 6. Kalibrierungs-Realität im Mittelstand
 
@@ -633,32 +659,44 @@ Die Marginal-Beobachtung im Einzel-Seed-Chaos (§5.3) bleibt anekdotisch.
 
 ## 7. Diskussion
 
-### 7.0 Quintessenz — ein klassischer Algorithmus schlägt die KI (mit einer Einschränkung)
+### 7.0 Quintessenz — ein klassischer Algorithmus schlägt die KI
 
-Das zentrale Resultat dieser Arbeit ist ein differenzierter Negativbefund:
+Das zentrale Resultat dieser Arbeit ist ein durchgehender Negativbefund mit klarer Aussage:
 
-> **Ein vernünftig modellierter VRPTW-Solver (OR-Tools) ist in geografisch dominierten, constraint-armen Tourenplanungs-Problemen ebenbürtig oder marginal überlegen gegenüber dem LLM-geführten Hybrid. Erst wenn eine zweite harte Zuordnungs-Dimension hinzukommt — hier: Qualifikations-Matching — zeigt sich ein erster, noch nicht signifikanter aber konsistent gerichteter Hybrid-Vorteil.**
+> **Ein vernünftig modellierter VRPTW-Solver (OR-Tools) ist in dieser Domäne ebenbürtig bis marginal überlegen gegenüber dem LLM-geführten Hybrid — über vier unabhängige Testsetups inklusive Skill-Heterogenität (30 Seeds) lässt sich keine Bedingung identifizieren, in der LLM-Augmentation einen statistisch signifikanten Performance-Vorteil liefert.**
 
 Die vier Stufen der Hypothesen-Prüfung:
 
 | Hypothese | Ergebnis |
 |---|---|
-| „Hybrid schlägt statische Kalibrierung bei variierenden Tagesprofilen" (§5.5) | Nicht belegt. OR-Tools ist robust gegen Penalty-Variation. |
-| „Hybrid setzt sich bei intraday Störungen und Replan-Notwendigkeit ab" (§5.6) | Nicht belegt. Replan hilft nur der Heuristik; Solver und Hybrid verlieren beide leicht. |
-| „Mit Tagesverlauf-Kontext kann das LLM tagesabhängig adaptiv reagieren" (§5.6) | Nicht belegt. Mit oder ohne Context identische Mittelwerte; nur Streuung sinkt minimal. |
-| **„Bei Skill-Heterogenität zeigt sich der Hybrid-Vorteil"** (§5.7) | **Richtungsweisend**: Hybrid erstmals nominell Platz 1 (+0.13 pp), und verliert −0.01 pp vs. −0.18 bis −0.55 bei statischen Varianten durch das Constraint. Statistisch noch nicht signifikant (n=10), aber die Richtung ist konsistent. |
+| „Hybrid schlägt statische Kalibrierung bei variierenden Tagesprofilen" (§5.5) | Nicht belegt. OR-Tools robust gegen Penalty-Variation. |
+| „Hybrid setzt sich bei intraday Störungen und Replan-Notwendigkeit ab" (§5.6) | Nicht belegt. Replan hilft nur der Heuristik. |
+| „Mit Tagesverlauf-Kontext kann das LLM tagesabhängig adaptiv reagieren" (§5.6) | Nicht belegt. Mit oder ohne Context identische Mittelwerte. |
+| „Bei Skill-Heterogenität zeigt sich der Hybrid-Vorteil" (§5.7) | **Nicht belegt.** 10-Seed-Pilotsignal (+0.13 pp Hybrid) bei 30 Seeds nicht reproduzierbar; die nominelle 30-Seed-Richtung (+0.55 pp OR-Tools) ist selbst bei n=30 nicht signifikant (p ≈ 0.3). Netto: kein detektierbarer Effekt in beide Richtungen. |
+
+**Warum der Solver so schwer zu schlagen ist: die flache Gewichts-Landschaft.**
+
+Es wäre falsch, die OR-Tools-Überlegenheit auf besonders geschickt gewählte Penalty-Gewichte zurückzuführen. Der Befund in §5.5 sagt genau das Gegenteil: selbst die bewusst schwach gewählte `ortools-naiv`-Variante liegt statistisch gleichauf mit `normal`, `chaos-safe` und `sla-boost`. Die `normal`-Kalibrierung ist nicht in einem schmalen Optimum, sondern irgendwo in einer großzügigen **robusten Plateau-Zone**.
+
+Das ist — nicht eine besondere handwerkliche Leistung der `normal`-Gewichte — der eigentliche Grund, warum der Hybrid in dieser Domäne keinen Hebel findet: wenn die Gewichts-Landschaft in einer breiten Zone flach ist, kann tägliches Umparametrisieren per LLM nichts herausholen, egal wie intelligent das LLM seine Auswahl trifft. Das LLM wählt jeden Tag einen Punkt **innerhalb** der Plateau-Fläche — die klassische Strategie wählt einen festen Punkt **im selben** Plateau. Beide liefern denselben Output.
+
+Diese Robustheit ist modell-spezifisch. In einer früheren Variante mit `SetBreakIntervalsOfVehicle` war die Landschaft deutlich empfindlicher (ein 58 %-Completion-Einbruch bei `base_penalty=2000`, §7.3). Der Wechsel auf die post-hoc Pause-Einfügung hat nebenbei die Kalibrierungs-Sensitivität fast eliminiert — ein Seiteneffekt, nicht ein bewusstes Design-Ziel, aber eine direkte Folge davon, wie die Pausen jetzt außerhalb des Routings gehandhabt werden.
+
+**Praktische Konsequenz:** Für ein Produktivsystem in genau dieser Größenordnung (10 Techniker, 40–50 Aufträge/Tag, 30-km-Radius, Standard-SLA- und Zeitfenster-Profile, optional Kälteschein-Constraint) sind die Gewichte der `normal`-Kalibrierung bereits in der guten Zone — ein Weiterkalibrieren würde keinen messbaren Gewinn bringen. Bei strukturellen Sprüngen (50+ Techniker, Multi-Depot, 4+ gleichzeitige Qualifikationen, deutlich andere Auftragsdichten) ist die flache Zone nicht verifiziert und sollte neu vermessen werden.
 
 **Was das für die KI-Debatte heißt, über diese Domäne hinaus:**
 
-1. **LLMs sind nicht automatisch das bessere Werkzeug.** Für einfache kombinatorische Optimierungsprobleme mit klaren Constraints und sauberem Cost-Modell gibt es seit Jahrzehnten spezialisierte Algorithmen (OR-Tools, Gurobi, CPLEX). In ihrem Domänenbereich sind sie überlegen — und nicht, weil sie mehr lösen, sondern weil sie das Richtige lösen.
+1. **LLMs sind nicht automatisch das bessere Werkzeug.** Für kombinatorische Optimierungsprobleme mit klaren Constraints und sauberem Cost-Modell gibt es seit Jahrzehnten spezialisierte Algorithmen (OR-Tools, Gurobi, CPLEX). In ihrem Domänenbereich sind sie überlegen — nicht weil sie mehr lösen, sondern weil sie das Richtige lösen.
 
-2. **Der Mehrwert von LLM-Augmentation skaliert mit der Dimensionalität des Problems.** In §5.5–§5.6 konnte der LLM den Kontext **lesen**, aber die Information übersetzte sich nicht in bessere Entscheidungen, weil der Solver unter der Haube schon robust war. In §5.7 mit Qualifikations-Constraint verschiebt sich das: der Hybrid wird konkurrenzfähig, sobald der statische Solver nicht mehr alle Trade-off-Dimensionen gleichzeitig optimal abdecken kann.
+2. **Der vermutete LLM-Hebel — „Kontextverständnis und strategische Adaptivität" — greift nicht automatisch.** Das LLM kann in unseren Tests den Kontext **lesen** (messbar im Reasoning), aber die Information übersetzt sich nicht in bessere Entscheidungen. Auch wenn zusätzliche Zuordnungs-Dimensionen wie Qualifikationen hinzukommen (was theoretisch dem Hybrid helfen sollte), bleibt der Performance-Vorteil unter statistischer Absicherung aus.
 
-3. **„LLM-Augmentation" ist keine freie Verbesserung.** API-Kosten, Latenz, Run-zu-Run-Variabilität und operative Abhängigkeiten sind real. Sie lohnen sich nur, wenn entweder messbarer Qualitätsgewinn oder struktureller Wert (Kalibrierungs-Ersatz, §6) den Aufwand rechtfertigt.
+3. **„LLM-Augmentation" ist keine freie Verbesserung.** API-Kosten, Latenz, Run-zu-Run-Variabilität und operative Abhängigkeiten sind real. Wenn der Mittelwert-Gewinn null ist, fallen diese Kosten ohne Gegenwert an. Ein guter Algorithmus schlägt einen LLM-Aufsatz nicht nur auf Qualität, sondern auch auf Kostenseite.
 
-4. **Die Grenze zwischen „Algorithmus reicht" und „LLM lohnt sich" verläuft entlang der Problemstruktur.** Geografisch dominiert, eine Lösungsdimension → Algorithmus reicht. Mehrdimensional, Skill-Heterogenität, harte Zuordnungs-Constraints → LLM-Adaption beginnt Relevanz zu gewinnen.
+4. **Methodik-Lesson: kleine Seed-Zahlen täuschen.** Der §5.7-Pilotlauf (10 Seeds) zeigte einen scheinbar konsistent gerichteten Hybrid-Vorteil, den wir vorsichtig als „nicht signifikant, aber richtungsweisend" eingeordnet hatten. Der 30-Seed-Absicherungslauf liefert die Nicht-Reproduktion: die Richtung dreht sich nominell um, und auch die gedrehte Richtung bleibt im Rauschen (p ≈ 0.3). Was korrekt bleibt nach Absicherung ist nicht „OR-Tools ist besser", sondern **„kein detektierbarer Effekt in beide Richtungen"**. Schlussfolgerung: bei richtungsrelevanten Signalen, deren Absolutwert <1 Stdev liegt, ist auch vorsichtige Interpretation trügerisch. Seed-Absicherung ist in solchen Experimenten keine Option, sondern Voraussetzung.
 
-Diese vier Punkte sind das, was in der aktuellen KI-Hype-Welle oft übersehen wird: _Wenn die Domäne ein solides algorithmisches Fundament hat und das Problem niedrigdimensional ist, ist LLM-Einsatz begründungspflichtig. Mit jeder zusätzlichen Problem-Dimension verschiebt sich diese Beweislast._
+5. **Der strukturelle Wert des Hybrid bleibt — ist aber ein Kompetenz-, kein Performance-Argument.** Im Mittelstand (§6) ersetzt der Hybrid eine Kalibrierungs-Entscheidung, die der Endnutzer nicht treffen will oder kann. Das ist ein valider, aber spezifischer Anwendungsfall — keine allgemeine Überlegenheit.
+
+Diese Punkte sind das, was in der aktuellen KI-Hype-Welle oft übersehen wird: _In einer Domäne mit etabliertem algorithmischem Fundament ist LLM-Einsatz begründungspflichtig — nicht die Nicht-Nutzung. Diese Begründungspflicht haben wir in keinem der vier Testsetups einlösen können._
 
 ### 7.1 Wann lohnt welches Verfahren?
 
@@ -705,7 +743,12 @@ Zwei frühere Bugs wurden im Verlauf des Projekts entdeckt und behoben:
 
 ## 8. Limitationen
 
-**Zur statistischen Absicherung** ist zwischen den Abschnitten zu unterscheiden: Die Detail-Tabellen in §5.1–5.3 basieren auf einzelnen Seeds und sind **illustrativ, nicht belastbar** — die Differenzen dort liegen innerhalb der Streuung. Die statistisch belastbaren Haupttests sind **§5.5 mit 20 Seeds** (statische Kalibrierungen bei 7h Netto-Basis — Zahlen sind tendenziell niedriger, Struktur der Befunde aber gleich) und **§5.6–§5.7 mit 10 Seeds** (Replan, Replan+Context, Qualifikationen bei 8h Netto-Basis). Für §5.7 wäre eine Erhöhung auf 20–30 Seeds wünschenswert, weil die dort beobachtete Richtungs-Änderung (Hybrid nominell vorn) statistisch nahe am Rauschen liegt; die Aussage „konsistent gerichtet, aber nicht signifikant" bleibt davon unberührt.
+**Zur statistischen Absicherung** ist zwischen den Abschnitten zu unterscheiden: Die Detail-Tabellen in §5.1–5.3 basieren auf einzelnen Seeds und sind **illustrativ, nicht belastbar** — die Differenzen dort liegen innerhalb der Streuung. Die statistisch belastbaren Haupttests sind **§5.5 mit 20 Seeds** (statische Kalibrierungen bei 7h Netto-Basis — Zahlen sind tendenziell niedriger, Struktur der Befunde aber gleich), **§5.6 mit 10 Seeds** (Replan, Replan+Context bei 8h Netto-Basis) und **§5.7 mit 30 Seeds** (Qualifikations-Constraint bei 8h Netto-Basis; die 10-Seed-Pilotzahlen sind im Bericht dokumentiert und archiviert, aber nicht mehr interpretationsführend).
+
+**Lessons Learned zur Seed-Größe.** Der §5.7-Pilotlauf (10 Seeds) produzierte einen scheinbar konsistent gerichteten Hybrid-Vorteil (+0.13 pp Completion bei Quals, −0.01 pp Constraint-Verlust). Wir hatten das vorsichtig als „richtungsweisend, aber nicht signifikant" eingeordnet — exakt die Formulierung, die sich bei enger Interpretation absichern soll. Der 30-Seed-Lauf hat die Richtung **umgedreht** (OR-Tools-normal +0.55 pp bei Quals, Hybrid −0.14 pp Constraint-Verlust). Daraus zwei methodische Regeln für zukünftige Benchmarks in dieser Umgebung:
+
+1. **Bei Effekt-Größen < 1 Stdev sind 10 Seeds zu wenig — auch für Richtungs-Aussagen.** Die Seed-Stdev liegt in unseren Tests bei ±2.0 bis ±3.0 pp Completion. Ein nomineller Effekt von 0.1–0.5 pp kann damit reines Seed-Rauschen sein, und die Rangfolge kann sich bei Verdopplung des Seed-Samples umkehren. Für richtungsweisende Aussagen in diesem Rauschbereich: Mindestens 30 Seeds, lieber 50.
+2. **Eine „nicht signifikant, aber richtungsweisend"-Einordnung ist keine Absicherung, sondern ein Risiko-Hinweis.** Wenn ein Befund die Kernthese berührt (wie §5.7 die Frage „gibt es irgendwo einen Hybrid-Vorteil?"), reicht diese Einordnung für einen belastbaren Bericht nicht aus. Entweder wird das Signal abgesichert, oder es wird nicht als Befund kommuniziert. In diesem Bericht haben wir beides getan: §5.7.1 ist als **Pilot mit widerlegter Hypothese** stehen geblieben (Nachvollziehbarkeit), die Kernaussagen in §7.0 und Zusammenfassung stehen aber auf §5.7.2 (30 Seeds).
 
 Weitere Einschränkungen:
 
@@ -720,21 +763,21 @@ Weitere Einschränkungen:
 
 ## 9. Ausblick
 
-Drei ursprüngliche Follow-Ups wurden im Projektverlauf abgearbeitet und sind jetzt in der Hauptstudie enthalten: statistische Absicherung (§5.5, 20 Seeds), intraday Re-Planung (§5.6), Skill-Heterogenität (§5.7). Die verbleibenden Fragen ordnen sich um die **§5.7-Richtungsänderung** als interessantesten Befund.
+Vier ursprüngliche Follow-Ups wurden im Projektverlauf abgearbeitet: statistische Absicherung (§5.5, 20 Seeds), intraday Re-Planung (§5.6, 10 Seeds), Skill-Heterogenität als Pilot (§5.7.1, 10 Seeds) und die Nachabsicherung dieses Pilot-Befundes (§5.7.2, 30 Seeds). Alle vier liefern denselben Negativbefund. Die interessanten offenen Fragen verschieben sich damit **weg von „ist das 10-Seed-§5.7-Signal echt?"** (erledigt — es war es nicht) **hin zu strukturell anderen Hypothesen**.
 
-1. **§5.7-Befund statistisch absichern.** Der Qualifikations-Constraint hat erstmals ein positives Hybrid-Signal geliefert (+0.13 pp Completion, −0.01 pp Constraint-Verlust gegenüber −0.18 pp bei statisch). Mit 10 Seeds im Rauschen, aber konsistent gerichtet. Ein 30-Seed-Lauf würde die Signifikanz entweder etablieren oder widerlegen. Das ist die **wichtigste offene Frage** dieser Arbeit.
+1. **Höhere Dimensionalität.** Eine einzelne Qualifikation hat den Hybrid-Vorteil nicht aktiviert. Die strukturell nächste offene Frage ist, ob **mehrere gleichzeitige** Zuordnungs-Dimensionen das Bild ändern: Gas / Öl / Wärmepumpe / Solarthermie parallel, Ersatzteil-Constraints pro Fahrzeug, Erfahrungslevel-gerechte Zuweisung, Auftrags-Abhängigkeiten („erst A dann B innerhalb 24 h"). Theoretisch wächst der Matching-Raum kombinatorisch mit jeder Dimension — ob OR-Tools dort an Grenzen stößt oder ob das LLM einen Reasoning-Vorteil findet, ist bei einer einzelnen Dimension nicht beantwortet worden.
 
-2. **Höhere Dimensionalität.** Einzelne Qualifikation (Kälteschein) zeigte schon einen Effekt. Interessant wäre: mehrere gleichzeitige Qualifikationen (Gas / Öl / Wärmepumpe / Solarthermie), Ersatzteil-Constraints pro Fahrzeug, Erfahrungslevel-gerechte Zuweisung, Auftrags-Abhängigkeiten („erst A dann B innerhalb 24 h"). Jede zusätzliche Dimension verschiebt die Balance in Richtung Hybrid — wenn §5.7 verallgemeinerbar ist.
+2. **Extrem-Fehlkalibrierung.** Die aktuellen Baselines decken „naiv bis sla-boost" ab, aber keine wirklich pathologischen Fehl-Einstellungen (`travel_weight_pct=500`, Penalties in Fahrzeit-Größenordnung). Bei solchen Konfigurationen könnte OR-Tools zusammenbrechen und der Hybrid den Ausgleich machen. Die empirisch offene Bastion — und durch §5.5 nicht ausgeschlossen, nur nicht betreten.
 
-3. **Extrem-Fehlkalibrierung.** Die aktuellen Baselines decken „naiv bis sla-boost" ab, aber keine wirklich pathologischen Fehl-Einstellungen (`travel_weight_pct=500`, Penalties in Fahrzeit-Größenordnung). Bei solchen Konfigurationen könnte OR-Tools zusammenbrechen und der Hybrid den Ausgleich machen. Die empirisch offene Bastion.
+3. **Operative Validierung im Feld.** Alle Tests hier sind simulativ. Die interessanteste offene Frage ist, ob sich die hier stabil negativen Mittelwerte auch an realen Betriebsdaten halten — insbesondere ob das LLM bei echten, multi-dimensionalen Lastprofilen (Qualifikationen, Wartungsverträge, saisonale Drift, kundenbezogene Präferenzen) einen Hebel findet, den ein statisch kalibrierter Solver nicht sieht. Ohne Felddaten bleibt der Schluss simulativ.
 
-4. **Operative Validierung im Feld.** Alle Tests hier sind simulativ. Die interessanteste Frage ist, ob die Ergebnisse mit realen Betriebsdaten übereinstimmen — insbesondere ob die §5.7-Richtungsänderung bei echten, multi-dimensionalen Lastprofilen (Qualifikationen, Wartungsverträge, saisonale Drift) stabil bleibt. Ohne Felddaten bleibt der Schluss simulativ.
+4. **Prompt-Caching effektiv nutzen.** System-Prompt auf >4 096 Tokens erweitern (Fallbeispiele, Policy-Katalog) für ~90 % Kostenreduktion auf wiederkehrenden Input-Tokens. Betrifft die Ökonomie des Hybrid, nicht die Qualität — aber relevant, wenn trotz fehlendem Performance-Vorteil der Hybrid aus strukturellen Gründen (§6) eingesetzt wird.
 
-5. **Prompt-Caching effektiv nutzen.** System-Prompt auf >4 096 Tokens erweitern (Fallbeispiele, Policy-Katalog) für ~90 % Kostenreduktion auf wiederkehrenden Input-Tokens. Betrifft die Ökonomie des Hybrid, nicht die Qualität.
+5. **Methodische Absicherung für Folgestudien.** Bei allen künftigen Tests mit Effekt-Größen im einstelligen pp-Bereich: mindestens 30 Seeds ansetzen, lieber 50. Die §5.7-Erfahrung zeigt, dass auch vorsichtig interpretierte 10-Seed-Richtungs-Signale trügerisch sein können, wenn die Kernthese auf ihnen ruht.
 
 Weitere technische Ideen: Ersetzen von Haversine durch OSRM; OR-Tools-Parametrisierung um Solver-Strategie (nicht nur Penalty-Gewichte) LLM-gesteuert auswählen zu lassen — das wäre eine andere Art von LLM-Nutzung als in dieser Arbeit.
 
-Die zentrale Erkenntnis der Arbeit bleibt mit der §5.7-Nuance: **in niedrigdimensionalen, constraint-armen Domänen mit etabliertem algorithmischem Fundament ist LLM-Augmentation begründungspflichtig. Mit jeder zusätzlichen Problem-Dimension verschiebt sich diese Beweislast.** Der Hybrid gewinnt nicht durch Zauberei, sondern dort wo die klassische Optimierung an ihre strukturellen Grenzen stößt — und das passiert in der Praxis öfter, als die ersten drei Testsetups vermuten ließen.
+Die zentrale Erkenntnis der Arbeit bleibt nach der 30-Seed-Absicherung **ungebrochen**: _In einer Domäne mit etabliertem algorithmischem Fundament ist LLM-Augmentation begründungspflichtig._ Der Hybrid gewinnt nicht durch Zauberei, und die vermutete „letzte Bastion" (Skill-Heterogenität) war sie nicht. Was bleibt, ist der **strukturelle** Mittelstand-Wert aus §6 — Ersatz einer Kalibrierungs-Entscheidung, die der Nutzer nicht treffen will —, nicht ein Performance-Vorsprung. Ob das genügt, den operativen Mehr-Aufwand zu rechtfertigen, ist eine Geschäfts-, keine Performance-Frage.
 
 ---
 

@@ -4,7 +4,9 @@
 
 Ein Experiment zur Frage: **Kann ein LLM-gestützter Scheduler einen klassischen VRPTW-Solver übertreffen — und wenn ja, wo?**
 
-Antwort der Arbeit, in zwei Sätzen: _In niedrigdimensionalen, geografisch dominierten Tourenplanungs-Problemen ist ein vernünftig konstruierter OR-Tools-Solver dem LLM-gestützten Hybrid ebenbürtig oder marginal überlegen. Erst wenn eine zweite harte Zuordnungs-Dimension hinzukommt — z. B. Skill-Matching wie der Kälteschein für Wärmepumpen — zeigt sich ein erster, konsistent gerichteter Hybrid-Vorteil. In einer Domäne mit etabliertem algorithmischem Fundament ist LLM-Augmentation begründungspflichtig — aber die Grenze verschiebt sich mit der Problem-Dimensionalität._
+Antwort der Arbeit, in einem Satz: _In einer Domäne mit etabliertem algorithmischem Fundament (VRPTW, OR-Tools) ist ein vernünftig konstruierter klassischer Solver dem LLM-gestützten Hybrid durchgehend ebenbürtig oder marginal überlegen — über vier unabhängige Testsetups inklusive Skill-Heterogenität (30 Seeds) lässt sich keine Bedingung identifizieren, in der LLM-Augmentation einen statistisch signifikanten Performance-Vorteil liefert._
+
+Ein Zwischenbefund aus einem 10-Seed-Pilotlauf zum Qualifikations-Constraint legte kurzzeitig einen ersten positiven Hybrid-Effekt nahe (+0.13 pp Completion). Der 30-Seed-Absicherungslauf reproduziert diese Richtung nicht — die nominelle Rangfolge dreht sich (OR-Tools-normal +0.55 pp vor Hybrid), bleibt aber selbst bei n=30 im Rauschen (p ≈ 0.3). Was die Absicherung **tatsächlich** zeigt: kein detektierbarer Effekt in beide Richtungen. Der Bericht dokumentiert beides und zieht daraus eine methodische Lesson Learned zur Seed-Größe.
 
 ## 📄 Auswertungen
 
@@ -39,14 +41,14 @@ Fiktiver Heizungsbaubetrieb in Oldenburg (Oldb.) mit **10 Servicetechnikern**, d
 
 ## Kern-Ergebnisse
 
-Vier unabhängige Haupttests in einer Progression — drei negative, ein richtungsweisend positiver Befund:
+Vier unabhängige Haupttests in einer Progression — **alle vier widerlegen die Hybrid-Hypothese**:
 
 | Test | Setup | Ergebnis |
 |---|---|---|
 | **Multi-Profil-Woche** | 20 Seeds, 5 Tagesprofile Mo–Fr + stochastische Intraday-Events; vier statische Kalibrierungen + Hybrid | Alle fünf Varianten **statistisch ununterscheidbar**. Hybrid liefert **keinen Performance-Vorteil**. |
 | **Replan-Test** | 10 Seeds, Intraday-Events triggern Scheduler-Replan | Replan hilft nur der Heuristik (+2.9 pp). Hybrid und OR-Tools verlieren beide leicht durch kleinteilige Replan-Zyklen. |
 | **Replan + Tagesverlauf-Kontext** | 10 Seeds, Hybrid bekommt Tagesverlaufs-Info (wievielter Replan, Trigger-Event, Rest-Schicht pro Tech) | **Kein Mittelwert-Gewinn** gegenüber „Replan ohne Kontext". Einziger Effekt: Streuung sinkt (±2.43 → ±1.73). |
-| **Qualifikations-Constraint** | 10 Seeds, 40 % Techniker mit Kälteschein, 20 % Aufträge erfordern ihn | **Erstes positives Signal**: Hybrid nominell +0.13 pp vor OR-Tools-normal, und verliert am wenigsten durch das Constraint (−0.01 pp vs. −0.18 bis −0.55 bei statischen Varianten). Statistisch noch nicht signifikant (n=10), aber konsistent gerichtet. |
+| **Qualifikations-Constraint** | 30 Seeds, 40 % Techniker mit Kälteschein, 20 % Aufträge erfordern ihn | **Hybrid-Hypothese nicht bestätigt.** 10-Seed-Pilotsignal (+0.13 pp Hybrid) bei 30 Seeds nicht reproduzierbar; die 30-Seed-Nominalrichtung (+0.55 pp OR-Tools) ist ebenfalls nicht signifikant (p ≈ 0.3). Netto: kein detektierbarer Effekt in beide Richtungen. |
 
 Details, Tabellen und Interpretation in der [wissenschaftlichen Auswertung](docs/auswertung.md).
 
