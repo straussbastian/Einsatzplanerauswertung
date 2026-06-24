@@ -1,0 +1,41 @@
+# Secrets
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+*.so
+.Python
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Virtualenvs
+.venv/
+venv/
+env/
+ENV/
+
+# VCS / Tooling
+.git/
+.github/
+.claude/
+
+# OS / Editor
+.DS_Store
+._*
+Thumbs.db
+.vscode/
+.idea/
+
+# Laufzeit-/Temp-Daten
+data/
+*.log
+
+# Doku & Benchmarks werden für den Betrieb nicht gebraucht (optional auskommentieren)
+# bench/
+# docs/
+# scenarios/  <- NICHT ignorieren, werden von der App geladen

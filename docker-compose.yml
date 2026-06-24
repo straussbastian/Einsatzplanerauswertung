@@ -1,0 +1,26 @@
+services:
+  einsatzplaner:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    # Coolify setzt SERVICE_FQDN_* / Domains selbst; das Image lauscht auf 8501.
+    # Kein Host-Port-Mapping: Coolifys Traefik-Proxy spricht den Container intern an.
+    expose:
+      - "8501"
+    labels:
+      - "coolify.traefik.middlewares=authentik-auth@file"
+    environment:
+      # Optional: nur für LLM-/Hybrid-Scheduler nötig.
+      # In Coolify als Environment Variable / Secret hinterlegen.
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+    restart: unless-stopped
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8501/_stcore/health').status==200 else 1)"
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
