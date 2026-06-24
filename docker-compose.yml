@@ -7,8 +7,8 @@ services:
     # Kein Host-Port-Mapping: Coolifys Traefik-Proxy spricht den Container intern an.
     expose:
       - "8501"
-    labels:
-      - "coolify.traefik.middlewares=authentik-auth@file"
+    #labels:
+    #  - "coolify.traefik.middlewares=authentik-auth@file"
     environment:
       # Optional: nur für LLM-/Hybrid-Scheduler nötig.
       # In Coolify als Environment Variable / Secret hinterlegen.
